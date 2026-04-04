@@ -34,3 +34,11 @@ Hexagonal (ports and adapters). See `docs/spec/design.md` for full spec.
 - `src/entrypoints/sidepanel/` -- Svelte 5 side panel UI
 - `src/entrypoints/content.ts` -- YouTube content script
 - `src/entrypoints/background.ts` -- Service worker message router
+
+## Interactive debugging
+
+- `playwright-cli` can open browsers for interactive inspection but cannot load
+  unpacked extensions directly. Use `just dev` to launch Chrome with the extension
+  loaded via WXT's dev mode, then use Chrome DevTools for debugging.
+- For automated E2E testing of the extension, use `just test-e2e` (Playwright
+  programmatic API with `launchPersistentContext` and `--load-extension` args).
