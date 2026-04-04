@@ -1,1 +1,11 @@
 .superpowers/
+
+# WXT / build output
+.output/
+.wxt/
+
+# Dependencies
+node_modules/
+
+# Bun
+bun.lock
