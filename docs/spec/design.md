@@ -75,6 +75,9 @@ All browser-specific and external dependencies are pushed to the edges. Core log
 - **Cache API** for ML model file caching (Transformers.js default); **IndexedDB** for formatted transcript caching. Both use the `unlimitedStorage` permission for generous quotas.
 - **Chrome sidePanel API** (MVP), Firefox sidebar_action (future adapter)
 - **bun** for package management and script execution
+- **Justfiles** for all build, test, lint, format, and dev commands. No bare `bun run` or `npx` invocations -- everything goes through `just` recipes.
+- **ESLint + Prettier** for linting and formatting (Biome lacks Svelte support)
+- **Red/green test-driven development.** Every feature starts with a failing test. `just test` runs in under a second for tight feedback. `just check` runs the full suite (tests + lint + typecheck + format-check) and is used by CI and pre-commit hooks. Claude runs `just test` after every change.
 - **Manifest V3** only, latest browser versions only
 
 ---
@@ -314,8 +317,8 @@ All commands go through `just`. No bare `bun run`, `npx`, or direct tool invocat
 |--------|-------------|
 | `just check` | All tests + lint + typecheck + format-check (used by CI and pre-commit hook) |
 | `just test` | Vitest unit tests |
-| `just lint` | ESLint (or Biome -- TBD during setup) |
-| `just fmt` | Prettier/Biome format |
+| `just lint` | ESLint |
+| `just fmt` | Prettier format |
 | `just build` | WXT build for Chrome |
 | `just clean` | Remove `.output/`, `.wxt/`, `node_modules/`, model caches |
 | `just bump` | Bump version, generate release notes, tag, push |
@@ -370,7 +373,7 @@ Not part of CI. Run manually during spike phases via `just model-bench`. Lives i
 Code change -> just test (<1s) -> just check (~5s) -> green
 ```
 
-For deeper integration testing: `just test-e2e` (~10s). For interactive debugging: Playwright MCP server (`@playwright/mcp`).
+For deeper integration testing: `just test-e2e` (~10s). For interactive debugging: `playwright-cli` skill (open browser, navigate, snapshot, inspect elements and console).
 
 ### CI
 
@@ -509,7 +512,7 @@ Goal: A Chrome extension that opens a side panel with "Hello World", fully teste
 - Playwright configured to load built extension
 - At least one unit test and one E2E test passing
 - CLAUDE.md, `.gitignore`, MIT license
-- Playwright MCP verified working for Claude interaction
+- `playwright-cli` skill verified working for Claude interactive debugging (open browser with extension, snapshot, inspect)
 
 ### Phase 2: Raw Transcript Display and Video Sync
 
@@ -584,7 +587,7 @@ Goal: Production-ready for Chrome Web Store and GitHub release.
 
 - **WebGPU in Firefox:** caniuse.com and other research disagree on whether Firefox 141+ has stable WebGPU support. Needs verification before the Firefox adapter phase. Affects which models are viable for Tier 3 (section headers) on Firefox. WASM fallback works regardless.
 - **Specific ML models for each tier:** Intentionally deferred to Phase 4 spike. The adapter pattern makes swapping trivial.
-- **Linter/formatter choice:** ESLint vs Biome. TBD during Phase 1 setup.
+- **`playwright-cli` extension loading:** The `playwright-cli` skill supports `--browser=chrome` but it's unclear if Chrome launch args (like `--load-extension`) can be passed to load our unpacked extension during interactive debugging. Needs verification during Phase 1. Workaround: use a persistent profile with the extension pre-installed.
 
 ---
 
