@@ -9,3 +9,8 @@ node_modules/
 
 # Bun
 bun.lock
+
+# Playwright
+test-results/
+playwright-report/
+.playwright-cli/
