@@ -1,6 +1,9 @@
+import { extractVideoId } from '../core/youtube';
+
 export default defineContentScript({
   matches: ['*://*.youtube.com/watch*'],
   main() {
-    console.log('[quoth] Content script loaded on YouTube video page');
+    const videoId = extractVideoId(window.location.href);
+    console.log('[quoth] Content script loaded. Video ID:', videoId);
   },
 });
