@@ -1,0 +1,32 @@
+/**
+ * ABOUTME: Core data types for transcript representation.
+ * ABOUTME: Used across all layers of the application.
+ */
+
+export interface TimedWord {
+  text: string;
+  start: number;
+  end: number;
+  original: string;
+}
+
+export interface ParagraphBreak {
+  wordIndex: number;
+  startTime: number;
+}
+
+export interface Section {
+  title: string;
+  paragraphIndex: number;
+  startTime: number;
+}
+
+export type FormattingTier = 0 | 1 | 2 | 3;
+
+export interface TimedTranscript {
+  videoId: string;
+  words: TimedWord[];
+  formattingTier: FormattingTier;
+  paragraphs: ParagraphBreak[];
+  sections: Section[];
+}
