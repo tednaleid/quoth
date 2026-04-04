@@ -15,14 +15,21 @@
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@testing-library/svelte": "^5.3.1",
     "@tsconfig/svelte": "^5.0.8",
     "@wxt-dev/module-svelte": "^2.0.4",
+    "eslint": "^10.2.0",
+    "eslint-plugin-svelte": "^3.17.0",
     "happy-dom": "^20.8.9",
+    "prettier": "^3.8.1",
+    "prettier-plugin-svelte": "^3.5.1",
     "svelte": "^5.53.7",
     "svelte-check": "^4.4.4",
+    "svelte-eslint-parser": "^1.6.0",
     "tslib": "^2.8.1",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.58.0",
     "vitest": "^4.1.2",
     "wxt": "^0.20.20"
   }

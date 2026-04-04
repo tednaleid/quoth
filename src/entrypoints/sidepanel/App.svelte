@@ -19,7 +19,10 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family:
+      system-ui,
+      -apple-system,
+      sans-serif;
     color: #e0e0e0;
     background: #1a1a2e;
   }
