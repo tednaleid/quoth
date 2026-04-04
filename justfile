@@ -1,0 +1,76 @@
+# ABOUTME: Build, test, and development commands for the Quoth browser extension.
+# ABOUTME: All commands should be run through these recipes, not directly via bun/npx.
+
+# Default recipe: show available commands
+default:
+    @just --list
+
+# Run all checks: tests, linting, typecheck, format check
+check: test lint typecheck fmt-check
+
+# Run unit tests
+test:
+    bunx vitest run
+
+# Run unit tests in watch mode
+test-watch:
+    bunx vitest
+
+# Run E2E tests (requires built extension)
+test-e2e: build
+    bunx playwright test
+
+# Run linter
+lint:
+    bunx eslint src/ tests/
+
+# Run formatter
+fmt:
+    bunx prettier --write "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"
+
+# Check formatting without modifying files
+fmt-check:
+    bunx prettier --check "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"
+
+# Run TypeScript type checking
+typecheck:
+    bunx wxt prepare && bunx tsc --noEmit
+
+# Build the extension for Chrome
+build:
+    bunx wxt build
+
+# Build the extension for Firefox (future)
+build-firefox:
+    bunx wxt build --browser firefox
+
+# Start dev mode with HMR
+dev:
+    bunx wxt
+
+# Clean build artifacts and caches
+clean:
+    rm -rf .output .wxt node_modules/.vite
+
+# Install git pre-commit hook
+install-hooks:
+    @echo '#!/bin/sh' > .git/hooks/pre-commit
+    @echo 'just check' >> .git/hooks/pre-commit
+    @chmod +x .git/hooks/pre-commit
+    @echo "Pre-commit hook installed."
+
+# Run model comparison harness (Phase 4+)
+model-bench *ARGS:
+    @echo "Model bench not yet implemented (Phase 4)"
+
+# Capture YouTube page fixture for testing (Phase 2+)
+fixture-capture URL:
+    @echo "Fixture capture not yet implemented (Phase 2)"
+
+# Bump version, generate release notes, tag, and push (Phase 6+)
+bump VERSION:
+    @echo "Bump not yet implemented (Phase 6)"
+
+# Re-trigger release workflow for existing version (Phase 6+)
+retag VERSION:
+    @echo "Retag not yet implemented (Phase 6)"
