@@ -17,6 +17,7 @@ export default [
       },
       globals: {
         ...globals.browser,
+        browser: 'readonly',
       },
     },
   },

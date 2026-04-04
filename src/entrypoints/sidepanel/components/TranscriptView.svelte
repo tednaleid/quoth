@@ -16,11 +16,12 @@
   let { words, segments, activeWordIndex, activeSegmentIndex, autoScroll, videoId, onSeek }: Props =
     $props();
 
-  let activeSegmentEl: HTMLElement | null = $state(null);
+  let segmentEls: (HTMLElement | undefined)[] = $state([]);
 
   $effect(() => {
-    if (autoScroll && activeSegmentEl) {
-      activeSegmentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const el = segmentEls[activeSegmentIndex];
+    if (autoScroll && el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   });
 
@@ -32,11 +33,7 @@
 
 <div class="transcript">
   {#each segments as segment, segIdx (segment.startIndex)}
-    <p
-      class="segment"
-      class:active={segIdx === activeSegmentIndex}
-      bind:this={segIdx === activeSegmentIndex ? activeSegmentEl : undefined}
-    >
+    <p class="segment" class:active={segIdx === activeSegmentIndex} bind:this={segmentEls[segIdx]}>
       <a
         class="timestamp"
         href={timestampUrl(segment.startTime)}
