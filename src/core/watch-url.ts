@@ -8,10 +8,13 @@ export interface WatchParams {
   initialTimeMs: number;
 }
 
+const YOUTUBE_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+
 export function parseWatchParams(queryString: string): WatchParams {
   const normalized = queryString.startsWith('?') ? queryString : '?' + queryString;
   const params = new URLSearchParams(normalized);
-  const videoId = params.get('v');
+  const rawVideoId = params.get('v');
+  const videoId = rawVideoId && YOUTUBE_ID_RE.test(rawVideoId) ? rawVideoId : null;
   const tRaw = params.get('t');
   let initialTimeMs = 0;
   if (tRaw) {
