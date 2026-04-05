@@ -4,8 +4,12 @@
  */
 import type { TimedWord, CaptionTrack, VideoInfo } from '../core/types';
 
+export interface VideoMetadata {
+  videoInfo: VideoInfo | null;
+  captionTracks: CaptionTrack[];
+}
+
 export interface TranscriptSource {
-  getVideoInfo(videoId: string): Promise<VideoInfo | null>;
-  getCaptionTracks(videoId: string): Promise<CaptionTrack[]>;
+  getVideoMetadata(videoId: string): Promise<VideoMetadata>;
   fetchTranscript(captionTrack: CaptionTrack): Promise<TimedWord[]>;
 }

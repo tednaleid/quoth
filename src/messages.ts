@@ -14,7 +14,4 @@ export type ContentMessage =
   | { type: 'time-update'; currentTimeMs: number; isPlaying: boolean };
 
 // Side panel -> Content script (via background)
-export type SidePanelMessage =
-  | { type: 'request-captions'; videoId: string; captionTrack: CaptionTrack }
-  | { type: 'seek-to'; timeMs: number }
-  | { type: 'request-state' };
+export type SidePanelMessage = { type: 'seek-to'; timeMs: number } | { type: 'request-state' };

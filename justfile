@@ -8,29 +8,29 @@ default:
 # Run all checks: tests, linting, typecheck, format check
 check: test lint typecheck fmt-check
 
-# Run unit tests
-test:
-    bunx vitest run
+# Run unit tests (optionally pass a file pattern, e.g. just test message-handler)
+test *ARGS:
+    bunx vitest run {{ARGS}}
 
 # Run unit tests in watch mode
-test-watch:
-    bunx vitest
+test-watch *ARGS:
+    bunx vitest {{ARGS}}
 
 # Run E2E tests (requires built extension)
 test-e2e: build
     bunx playwright test
 
-# Run linter
-lint:
-    bunx eslint src/ tests/
+# Run linter (optionally pass specific files, e.g. just lint src/core/types.ts)
+lint *ARGS:
+    {{ if ARGS == "" { "bunx eslint src/ tests/" } else { "bunx eslint " + ARGS } }}
 
-# Run formatter
-fmt:
-    bunx prettier --write "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"
+# Run formatter (optionally pass specific files, e.g. just fmt src/core/types.ts)
+fmt *ARGS:
+    {{ if ARGS == "" { 'bunx prettier --write "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"' } else { "bunx prettier --write " + ARGS } }}
 
 # Check formatting without modifying files
-fmt-check:
-    bunx prettier --check "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"
+fmt-check *ARGS:
+    {{ if ARGS == "" { 'bunx prettier --check "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"' } else { "bunx prettier --check " + ARGS } }}
 
 # Run TypeScript type checking
 typecheck:

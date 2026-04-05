@@ -1,82 +1,36 @@
-import { extractVideoInfo, extractCaptionTracks } from '../adapters/youtube/innertube';
-import { parseJson3Captions } from '../core/caption-parser';
+/**
+ * ABOUTME: YouTube content script (isolated world) - wires adapters to extension messaging.
+ * ABOUTME: Instantiates TranscriptSource and VideoPlayer adapters, handles page navigation events.
+ */
+import { YouTubeTranscriptSource } from '../adapters/youtube/transcript-source';
+import { YouTubeVideoPlayer } from '../adapters/youtube/video-player';
 import { extractVideoId } from '../core/youtube';
 import type { ContentMessage, SidePanelMessage } from '../messages';
-
-const INNERTUBE_URL = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
-const ANDROID_CONTEXT = {
-  client: {
-    clientName: 'ANDROID',
-    clientVersion: '20.10.38',
-  },
-};
-const ANDROID_UA = 'com.google.android.youtube/20.10.38 (Linux; U; Android 14)';
 
 export default defineContentScript({
   matches: ['*://*.youtube.com/watch*'],
   main() {
     let currentVideoId: string | null = null;
-    let timeUpdateInterval: ReturnType<typeof setInterval> | null = null;
-
-    function getYouTubePlayer(): HTMLVideoElement | null {
-      return document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
-    }
-
-    // Seek via the main-world player script (uses YouTube's seekTo API)
-    function seekYouTubePlayer(timeSeconds: number) {
-      window.postMessage({ type: 'quoth-seek', timeSeconds }, '*');
-    }
+    let stopTimeUpdates: (() => void) | null = null;
 
     function sendMessage(message: ContentMessage) {
       browser.runtime.sendMessage(message).catch(() => {});
     }
 
-    // Fetch player response via Innertube ANDROID client (works without page cookies)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async function fetchPlayerResponse(videoId: string): Promise<any> {
-      const response = await fetch(INNERTUBE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': ANDROID_UA,
-        },
-        body: JSON.stringify({
-          context: ANDROID_CONTEXT,
-          videoId,
-        }),
-      });
-      if (!response.ok) return null;
-      return response.json();
-    }
+    const transcriptSource = new YouTubeTranscriptSource();
 
-    function startTimeUpdates() {
-      stopTimeUpdates();
-      timeUpdateInterval = setInterval(() => {
-        const player = getYouTubePlayer();
-        if (!player) return;
-        sendMessage({
-          type: 'time-update',
-          currentTimeMs: Math.round(player.currentTime * 1000),
-          isPlaying: !player.paused,
-        });
-      }, 250);
-    }
-
-    function stopTimeUpdates() {
-      if (timeUpdateInterval) {
-        clearInterval(timeUpdateInterval);
-        timeUpdateInterval = null;
-      }
-    }
+    const player = new YouTubeVideoPlayer({
+      getVideoElement: () =>
+        document.querySelector('video.html5-main-video') as HTMLVideoElement | null,
+      postSeek: (timeSeconds) => window.postMessage({ type: 'quoth-seek', timeSeconds }, '*'),
+    });
 
     async function handleVideoPage() {
       const videoId = extractVideoId(window.location.href);
       if (!videoId || videoId === currentVideoId) return;
       currentVideoId = videoId;
 
-      const playerResponse = await fetchPlayerResponse(videoId);
-      const videoInfo = playerResponse ? extractVideoInfo(playerResponse) : null;
-      const captionTracks = playerResponse ? extractCaptionTracks(playerResponse) : [];
+      const { videoInfo, captionTracks } = await transcriptSource.getVideoMetadata(videoId);
 
       if (videoInfo) {
         sendMessage({
@@ -90,9 +44,7 @@ export default defineContentScript({
       const englishTrack = captionTracks.find((t) => t.languageCode === 'en');
       if (englishTrack) {
         try {
-          const response = await fetch(englishTrack.baseUrl);
-          const json3 = await response.json();
-          const words = parseJson3Captions(json3);
+          const words = await transcriptSource.fetchTranscript(englishTrack);
           sendMessage({ type: 'captions-loaded', videoId, words });
         } catch (err) {
           sendMessage({
@@ -109,12 +61,19 @@ export default defineContentScript({
         });
       }
 
-      startTimeUpdates();
+      if (stopTimeUpdates) stopTimeUpdates();
+      stopTimeUpdates = player.onTimeUpdate((state) => {
+        sendMessage({
+          type: 'time-update',
+          currentTimeMs: state.currentTimeMs,
+          isPlaying: state.isPlaying,
+        });
+      });
     }
 
     browser.runtime.onMessage.addListener((message: SidePanelMessage) => {
       if (message.type === 'seek-to') {
-        seekYouTubePlayer(message.timeMs / 1000);
+        player.seekTo(message.timeMs);
       }
       if (message.type === 'request-state') {
         currentVideoId = null;

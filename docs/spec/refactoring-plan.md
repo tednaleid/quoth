@@ -42,6 +42,8 @@ The 40% of code that touches browser APIs has zero test coverage. The ports were
 
 ### Phases still ahead
 
+- **This refactoring** (between Phase 2 and Phase 3)
+- **Firefox support:** Dedicated phase immediately after refactoring. Firefox is the primary target browser. Covers sidebarAction API, manifest differences, cross-browser smoke testing.
 - **Phase 3:** Search and markdown export (pure logic, straightforward)
 - **Phase 4:** ML formatting pipeline with model comparison harness
 - **Phase 5:** Paragraph segmentation and section headers
@@ -60,8 +62,25 @@ The 40% of code that touches browser APIs has zero test coverage. The ports were
 
 - Full dependency injection framework -- overkill for an extension
 - SidebarHost port implementation -- the Svelte component IS the view layer, abstracting it adds no value
-- Refactoring youtube-player.content.ts -- it's 22 lines of glue code, not worth abstracting
+- Refactoring youtube-player.content.ts -- it's 22 lines of main-world glue code that just receives postMessage and calls player.seekTo(). The VideoPlayer port/adapter wraps the *content.ts side* of this interaction (polling, seeking via postMessage), not the main-world script itself.
 - Refactoring background.ts -- it's a simple message router, testable enough as-is with fakeBrowser
+- Implementing PageDetector port -- `extractVideoId()` is already pure/tested in core, the remaining page detection is 3 lines of DOM event wiring (`yt-navigate-finish` listener). Delete the dead port file.
+
+### Cleanup included
+
+- Delete `src/ports/page-detector.ts` (dead code, not worth implementing)
+- Delete `src/ports/video-player.ts` after the adapter is created (interface moves to the adapter file or stays if preferred)
+- Remove unused `request-captions` variant from `SidePanelMessage` in `src/messages.ts`
+
+### Convention note for implementers
+
+All source files in this project use a 2-line `ABOUTME:` comment header. Every new file must include this. Example:
+```typescript
+/**
+ * ABOUTME: Pure state machine for handling ContentMessages in the side panel.
+ * ABOUTME: No browser APIs -- maps messages to TranscriptState transitions.
+ */
+```
 
 ---
 
@@ -73,15 +92,14 @@ The 40% of code that touches browser APIs has zero test coverage. The ports were
 src/
   core/
     message-handler.ts              # Pure state machine for handling ContentMessages
+    tab-connector.ts                # Tab discovery/switching logic
 
   adapters/
     youtube/
       transcript-source.ts          # Implements TranscriptSource port (Innertube + JSON3)
+      video-player.ts               # Implements VideoPlayer port (DOM polling + postMessage seek)
     mock/
       mock-transcript-source.ts     # Test adapter with fixture data
-
-  core/
-    tab-connector.ts                # Tab discovery/switching logic
 
 tests/
   unit/
@@ -90,6 +108,7 @@ tests/
       tab-connector.test.ts         # Tab management tests
     adapters/
       transcript-source.test.ts     # Innertube adapter tests
+      video-player.test.ts          # Video player adapter tests
 ```
 
 ### Modified files
@@ -102,6 +121,15 @@ src/
       App.svelte                    # Slim: import message handler, minimal browser glue
   ports/
     transcript-source.ts            # May need minor interface adjustments
+  messages.ts                       # Remove unused request-captions variant
+```
+
+### Deleted files
+
+```
+src/
+  ports/
+    page-detector.ts                # Dead code -- extractVideoId is already pure in core
 ```
 
 ---
@@ -179,6 +207,11 @@ let state: TranscriptState = $state(createInitialState());
 state = handleMessage(state, message);
 ```
 
+**Important:** Also remove the `$effect` block (current lines 24-30) that computes
+segments from words. The message handler now computes segments inside
+`handleMessage` when processing `captions-loaded`, so the reactive `$effect` is
+redundant and must be deleted to avoid duplicate computation.
+
 - [ ] **Step 6: Run `just check` and `just smoke-test`**
 - [ ] **Step 7: Commit**
 
@@ -213,11 +246,14 @@ without hitting the network.
 export class YouTubeTranscriptSource implements TranscriptSource {
   constructor(private fetchFn: typeof fetch = fetch) {}
 
-  async getVideoInfo(videoId: string): Promise<VideoInfo | null> { ... }
-  async getCaptionTracks(videoId: string): Promise<CaptionTrack[]> { ... }
+  async getVideoMetadata(videoId: string): Promise<VideoMetadata> { ... }
   async fetchTranscript(captionTrack: CaptionTrack): Promise<TimedWord[]> { ... }
 }
 ```
+
+`getVideoMetadata` makes a single Innertube API call and returns both
+`videoInfo` and `captionTracks` from the same player response. This avoids
+the double-fetch that would occur if they were separate methods.
 
 The existing `extractVideoInfo`, `extractCaptionTracks`, and
 `parseJson3Captions` functions are reused inside the adapter.
@@ -228,9 +264,8 @@ The existing `extractVideoInfo`, `extractCaptionTracks`, and
 Content script becomes slim:
 ```typescript
 const source = new YouTubeTranscriptSource();
-const videoInfo = await source.getVideoInfo(videoId);
-const tracks = await source.getCaptionTracks(videoId);
-const words = await source.fetchTranscript(tracks[0]);
+const { videoInfo, captionTracks } = await source.getVideoMetadata(videoId);
+const words = await source.fetchTranscript(captionTracks[0]);
 ```
 
 - [ ] **Step 5: Run `just check` and `just smoke-test`**
@@ -260,7 +295,85 @@ export class FixtureTranscriptSource implements TranscriptSource {
 
 ---
 
-## Task 4: Extract Tab Management from App.svelte
+## Task 4: Create VideoPlayer Adapter
+
+Extract the video player interaction code from content.ts (~48 lines) into an
+adapter that implements the VideoPlayer port. This wraps DOM polling for
+`video.currentTime`, seeking via `window.postMessage`, and the 250ms time-update
+interval.
+
+Note: this does NOT touch `youtube-player.content.ts` (the 22-line main-world
+script). That stays as-is. This adapter wraps the *content.ts side* of the
+interaction -- the isolated-world code that reads the DOM and sends postMessage.
+
+**Files:**
+- Create: `src/adapters/youtube/video-player.ts`
+- Create: `tests/unit/adapters/video-player.test.ts`
+- Modify: `src/entrypoints/content.ts`
+- Modify: `src/ports/video-player.ts` (if interface needs adjustment)
+
+- [ ] **Step 1: Write failing tests**
+
+Test with injected dependencies (no real DOM needed):
+- `getState()` reads from the provided video element getter
+- `seekTo(timeMs)` calls the injected postMessage sender with correct seconds conversion
+- `onTimeUpdate(callback)` sets up interval, calls callback with state, returns cleanup function
+- `onTimeUpdate` cleanup function clears the interval
+
+Use dependency injection for the DOM access:
+```typescript
+interface VideoPlayerDeps {
+  getVideoElement: () => HTMLVideoElement | null;
+  postSeek: (timeSeconds: number) => void;
+}
+```
+
+- [ ] **Step 2: Run tests, verify they fail**
+- [ ] **Step 3: Implement the adapter**
+
+```typescript
+export class YouTubeVideoPlayer implements VideoPlayer {
+  constructor(private deps: VideoPlayerDeps) {}
+
+  getState(): VideoPlayerState {
+    const video = this.deps.getVideoElement();
+    if (!video) return { currentTimeMs: 0, isPlaying: false, durationMs: 0 };
+    return {
+      currentTimeMs: Math.round(video.currentTime * 1000),
+      isPlaying: !video.paused,
+      durationMs: Math.round(video.duration * 1000),
+    };
+  }
+
+  seekTo(timeMs: number): void {
+    this.deps.postSeek(timeMs / 1000);
+  }
+
+  onTimeUpdate(callback: (state: VideoPlayerState) => void): () => void {
+    const interval = setInterval(() => {
+      const state = this.getState();
+      callback(state);
+    }, 250);
+    return () => clearInterval(interval);
+  }
+}
+```
+
+Default deps for production use in content.ts:
+```typescript
+const player = new YouTubeVideoPlayer({
+  getVideoElement: () => document.querySelector('video.html5-main-video') as HTMLVideoElement | null,
+  postSeek: (timeSeconds) => window.postMessage({ type: 'quoth-seek', timeSeconds }, '*'),
+});
+```
+
+- [ ] **Step 4: Run tests, verify they pass**
+- [ ] **Step 5: Run `just check`**
+- [ ] **Step 6: Commit**
+
+---
+
+## Task 5: Extract Tab Management from App.svelte
 
 The tab discovery and switching logic (`findYouTubeTab`,
 `browser.tabs.onActivated`, `connectToYouTubeTab`) is currently inline in
@@ -285,30 +398,35 @@ Test:
 
 ---
 
-## Task 5: Slim Down content.ts
+## Task 6: Slim Down content.ts and Clean Up Dead Code
 
-After Task 2, content.ts should be mostly adapter instantiation + message
-wiring. Review and ensure it's as thin as possible.
+After Tasks 2 and 4, content.ts should be mostly adapter instantiation + message
+wiring. Review and ensure it's as thin as possible. Also clean up dead code
+identified during planning.
 
 **Files:**
 - Modify: `src/entrypoints/content.ts`
+- Modify: `src/messages.ts` (remove unused `request-captions` variant)
+- Delete: `src/ports/page-detector.ts`
 
 - [ ] **Step 1: Review content.ts**
 
 The content script should do only:
-1. Instantiate `YouTubeTranscriptSource`
+1. Instantiate `YouTubeTranscriptSource` and `YouTubeVideoPlayer`
 2. Listen for `yt-navigate-finish` events
 3. On video page: fetch transcript via adapter, send messages
-4. Start time-update polling (this stays in content.ts -- it's DOM access)
-5. Handle `seek-to` and `request-state` messages
+4. Start time-update polling via `YouTubeVideoPlayer.onTimeUpdate()`
+5. Handle `seek-to` via `YouTubeVideoPlayer.seekTo()` and `request-state` messages
 
 - [ ] **Step 2: Remove any remaining inline logic that belongs in core/adapters**
-- [ ] **Step 3: Run `just check` and `just smoke-test`**
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Remove unused `request-captions` variant from SidePanelMessage in messages.ts**
+- [ ] **Step 4: Delete `src/ports/page-detector.ts`**
+- [ ] **Step 5: Run `just check` and `just smoke-test`**
+- [ ] **Step 6: Commit**
 
 ---
 
-## Task 6: Final Verification
+## Task 7: Final Verification
 
 - [ ] **Step 1: `just clean && bun install && just check`**
 - [ ] **Step 2: `just test-e2e`**
@@ -337,3 +455,18 @@ After this refactoring:
 - `src/entrypoints/` should be thin wiring code
 - Message handling should be fully unit-tested
 - TranscriptSource adapter should be testable with injected fetch
+- VideoPlayer adapter should be testable with injected deps
+- No dead port interfaces remaining
+
+## What Comes Next
+
+After this refactoring, the next priority is **Firefox support** -- not a polish
+item, but a dedicated phase. Firefox is the primary target browser. Our test
+infrastructure (Playwright tab mode) is browser-agnostic, so the dev/test loop
+translates directly. The main work is:
+- `browser.sidebarAction` (Firefox) vs `chrome.sidePanel` (Chrome) in background.ts
+- Manifest differences (WXT handles most of this via `just build-firefox`)
+- Smoke testing in Firefox via Playwright
+
+The hexagonal architecture from this refactoring makes Firefox support
+straightforward -- browser-specific code is isolated in thin entrypoints.
