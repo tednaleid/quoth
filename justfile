@@ -32,9 +32,9 @@ fmt *ARGS:
 fmt-check *ARGS:
     {{ if ARGS == "" { 'bunx prettier --check "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"' } else { "bunx prettier --check " + ARGS } }}
 
-# Run TypeScript type checking
-typecheck:
-    bunx wxt prepare && bunx tsc --noEmit
+# Run TypeScript type checking (optionally pass tsc flags, e.g. just typecheck --listFiles)
+typecheck *ARGS:
+    bunx wxt prepare && bunx tsc --noEmit {{ARGS}}
 
 # Build the extension for Chrome
 build:
