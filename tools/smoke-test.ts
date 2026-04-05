@@ -109,5 +109,65 @@ if (wordStart && timeAfter !== null) {
   }
 }
 
+// Test pop-out button
+console.log('\n--- Pop-out test ---');
+const popoutButton = sidePanelPage.locator('button[title*="Open in full tab"]');
+const popoutCount = await popoutButton.count();
+console.log(`Pop-out button present: ${popoutCount > 0}`);
+
+if (popoutCount === 0) {
+  console.log('Pop-out button not found');
+  await context.close();
+  process.exit(1);
+}
+
+// Listen for the new tab/page to be created
+const [watchPage] = await Promise.all([
+  context.waitForEvent('page', { timeout: 10000 }),
+  popoutButton.click(),
+]);
+
+await watchPage.waitForLoadState('load', { timeout: 10000 });
+const watchUrl = watchPage.url();
+console.log(`Pop-out opened: ${watchUrl}`);
+
+// Verify URL format: chrome-extension://<id>/watch.html?v=<videoId>&t=<seconds>
+const urlMatch = watchUrl.match(
+  /^chrome-extension:\/\/[a-z]+\/watch\.html\?v=([A-Za-z0-9_-]{11})&t=(\d+)$/
+);
+if (!urlMatch) {
+  console.log(`Pop-out URL does not match expected format: ${watchUrl}`);
+  await context.close();
+  process.exit(1);
+}
+const [, poppedVideoId, poppedSeconds] = urlMatch;
+console.log(`Popped videoId: ${poppedVideoId}, t=${poppedSeconds}s`);
+
+// Verify it matches the video we were watching
+const expectedVideoId = new URL(videoUrl).searchParams.get('v');
+if (poppedVideoId !== expectedVideoId) {
+  console.log(`Pop-out videoId mismatch: expected ${expectedVideoId}, got ${poppedVideoId}`);
+  await context.close();
+  process.exit(1);
+}
+
+// Verify the watch page actually loaded (transcript appears)
+console.log('Waiting for watch-page transcript to load...');
+try {
+  await watchPage.waitForSelector('.word', { timeout: 20000 });
+  const popoutWordCount = await watchPage.locator('.word').count();
+  console.log(`Watch page words loaded: ${popoutWordCount}`);
+  if (popoutWordCount === 0) {
+    console.log('Pop-out: watch page transcript is empty');
+    await context.close();
+    process.exit(1);
+  }
+  console.log('Pop-out: WORKING');
+} catch (err) {
+  console.log(`Pop-out: watch page failed to load transcript: ${err}`);
+  await context.close();
+  process.exit(1);
+}
+
 console.log('\nSMOKE TEST PASSED');
 await context.close();
