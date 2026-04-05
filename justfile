@@ -16,8 +16,9 @@ test *ARGS:
 test-watch *ARGS:
     bunx vitest {{ARGS}}
 
-# Run E2E tests (requires built extension)
-test-e2e: build
+# Run E2E tests (Chromium-based, requires Chrome build)
+test-e2e:
+    just build chrome
     bunx playwright test
 
 # Run linter (optionally pass specific files, e.g. just lint src/core/types.ts)
@@ -36,17 +37,13 @@ fmt-check *ARGS:
 typecheck *ARGS:
     bunx wxt prepare && bunx tsc --noEmit {{ARGS}}
 
-# Build the extension for Chrome
-build:
-    bunx wxt build
+# Build the extension (default: firefox, or specify: just build chrome)
+build BROWSER="firefox":
+    bunx wxt build --browser {{BROWSER}}
 
-# Build the extension for Firefox (future)
-build-firefox:
-    bunx wxt build --browser firefox
-
-# Start dev mode with HMR
-dev:
-    bunx wxt
+# Start dev mode with HMR (default: firefox, or specify: just dev chrome)
+dev BROWSER="firefox":
+    bunx wxt --browser {{BROWSER}}
 
 # Clean build artifacts and caches
 clean:
@@ -59,9 +56,15 @@ install-hooks:
     @chmod +x .git/hooks/pre-commit
     @echo "Pre-commit hook installed."
 
-# Smoke test: load extension and navigate to YouTube
+# Smoke test: load Chrome extension and navigate to YouTube (Chromium only -- Playwright cannot load Firefox extensions)
 smoke-test *URL:
+    just build chrome
     bun run tools/smoke-test.ts {{URL}}
+
+# Firefox tab-mode smoke test: verify side panel renders in Gecko engine
+smoke-test-firefox:
+    just build
+    bun run tools/smoke-test-firefox.ts
 
 # Run model comparison harness (Phase 4+)
 model-bench *ARGS:
