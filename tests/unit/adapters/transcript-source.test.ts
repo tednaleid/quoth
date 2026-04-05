@@ -14,6 +14,35 @@ function makeFetch(responseData: unknown, ok = true): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
+describe('YouTubeTranscriptSource constructor', () => {
+  it('default fetchFn does not lose the window.fetch binding', async () => {
+    // Reproduces the "Illegal invocation" bug: when fetch is stored as a plain
+    // property and called via `this.fetchFn(...)`, it can lose its window
+    // binding. The fix wraps fetch in an arrow function.
+    const globalFetch = vi.fn().mockImplementation(function (this: unknown) {
+      // Simulate browser's strict this-check. Chrome's fetch throws if
+      // called without being bound to window.
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = globalFetch as unknown as typeof fetch;
+    try {
+      // Construct without passing fetchFn, forcing use of the default
+      const source = new YouTubeTranscriptSource();
+      // This would throw "Illegal invocation" if the binding is lost
+      await expect(source.getVideoMetadata('abc123')).resolves.toBeDefined();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 describe('YouTubeTranscriptSource.getVideoMetadata', () => {
   it('calls Innertube ANDROID API with correct URL, method, headers, and body', async () => {
     const mockFetch = makeFetch(playerResponseFixture);

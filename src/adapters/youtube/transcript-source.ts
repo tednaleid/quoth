@@ -17,7 +17,13 @@ const ANDROID_CONTEXT = {
 const ANDROID_UA = 'com.google.android.youtube/20.10.38 (Linux; U; Android 14)';
 
 export class YouTubeTranscriptSource implements TranscriptSource {
-  constructor(private fetchFn: typeof fetch = fetch) {}
+  // Wrap fetch in an arrow function so calls don't lose the window binding.
+  // Chrome's fetch throws "Illegal invocation" when `this` isn't window.
+  private readonly fetchFn: typeof fetch;
+
+  constructor(fetchFn: typeof fetch = (...args) => fetch(...args)) {
+    this.fetchFn = fetchFn;
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async fetchPlayerResponse(videoId: string): Promise<any> {
