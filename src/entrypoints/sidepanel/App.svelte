@@ -1,67 +1,16 @@
 <script lang="ts">
-  import type { TimedWord, VideoInfo } from '../../core/types';
-  import type { WordSegment } from '../../core/playback-sync';
   import {
-    findActiveWordIndex,
-    findActiveSegmentIndex,
-    groupWordsIntoSegments,
-  } from '../../core/playback-sync';
+    createInitialState,
+    handleMessage,
+    type TranscriptState,
+  } from '../../core/message-handler';
   import type { ContentMessage, SidePanelMessage } from '../../messages';
   import Header from './components/Header.svelte';
   import StatusBar from './components/StatusBar.svelte';
   import TranscriptView from './components/TranscriptView.svelte';
 
-  let videoInfo: VideoInfo | null = $state(null);
-  let words: TimedWord[] = $state([]);
-  let segments: WordSegment[] = $state([]);
-  let activeWordIndex = $state(-1);
-  let activeSegmentIndex = $state(-1);
+  let state: TranscriptState = $state(createInitialState());
   let autoScroll = $state(true);
-  let status = $state('Open a YouTube video to see its transcript.');
-
-  const SEGMENT_GAP_MS = 2000;
-
-  $effect(() => {
-    if (words.length > 0) {
-      segments = groupWordsIntoSegments(words, SEGMENT_GAP_MS);
-    } else {
-      segments = [];
-    }
-  });
-
-  function handleMessage(message: ContentMessage) {
-    switch (message.type) {
-      case 'video-detected':
-        videoInfo = message.videoInfo;
-        status = 'Loading captions...';
-        break;
-
-      case 'captions-loaded':
-        words = message.words;
-        status = `${message.words.length} words loaded`;
-        break;
-
-      case 'captions-error':
-        status = `Error: ${message.error}`;
-        break;
-
-      case 'video-left':
-        videoInfo = null;
-        words = [];
-        segments = [];
-        activeWordIndex = -1;
-        activeSegmentIndex = -1;
-        status = 'Open a YouTube video to see its transcript.';
-        break;
-
-      case 'time-update':
-        if (words.length > 0) {
-          activeWordIndex = findActiveWordIndex(words, message.currentTimeMs);
-          activeSegmentIndex = findActiveSegmentIndex(segments, message.currentTimeMs);
-        }
-        break;
-    }
-  }
 
   // Track the YouTube tab we're connected to
   let youtubeTabId: number | null = $state(null);
@@ -86,7 +35,7 @@
   // Only handle messages from the tab we're connected to
   browser.runtime.onMessage.addListener((message: ContentMessage, sender) => {
     if (sender.tab?.id && sender.tab.id === youtubeTabId) {
-      handleMessage(message);
+      state = handleMessage(state, message);
     }
   });
 
@@ -97,12 +46,7 @@
       if (tab.id !== youtubeTabId) {
         youtubeTabId = tab.id!;
         // Reset state and request transcript from the new tab
-        words = [];
-        segments = [];
-        videoInfo = null;
-        activeWordIndex = -1;
-        activeSegmentIndex = -1;
-        status = 'Loading...';
+        state = { ...createInitialState(), status: 'Loading...' };
         sendToContent({ type: 'request-state' });
       }
     }
@@ -132,28 +76,28 @@
 
 <main>
   <Header
-    title={videoInfo?.title ?? ''}
+    title={state.videoInfo?.title ?? ''}
     {autoScroll}
     onToggleAutoScroll={() => (autoScroll = !autoScroll)}
   />
 
-  {#if words.length > 0}
+  {#if state.words.length > 0}
     <TranscriptView
-      {words}
-      {segments}
-      {activeWordIndex}
-      {activeSegmentIndex}
+      words={state.words}
+      segments={state.segments}
+      activeWordIndex={state.activeWordIndex}
+      activeSegmentIndex={state.activeSegmentIndex}
       {autoScroll}
-      videoId={videoInfo?.videoId ?? ''}
+      videoId={state.videoInfo?.videoId ?? ''}
       onSeek={handleSeek}
     />
   {:else}
     <div class="placeholder">
-      <p>{status}</p>
+      <p>{state.status}</p>
     </div>
   {/if}
 
-  <StatusBar {status} />
+  <StatusBar status={state.status} />
 </main>
 
 <style>
