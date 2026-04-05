@@ -1,7 +1,7 @@
 #!/usr/bin/env -S bun run
 /**
  * ABOUTME: Smoke test for the watch-page entry: loads chrome-extension://.../watch.html directly.
- * ABOUTME: Verifies iframe embed loads, transcript populates, click-to-seek works.
+ * ABOUTME: Verifies iframe embed loads, transcript populates, click-to-seek works, active-word advances.
  */
 
 import { chromium } from 'playwright';
@@ -10,18 +10,34 @@ import path from 'path';
 const extensionPath = path.resolve('.output/chrome-mv3');
 const videoId = process.argv[2] || 'YwZR6tc7qYg';
 
-console.log('Launching browser with extension...');
-const context = await chromium.launchPersistentContext('', {
-  headless: false,
-  args: [
+async function launchContext(headless: boolean) {
+  const args = [
     `--disable-extensions-except=${extensionPath}`,
     `--load-extension=${extensionPath}`,
-  ],
-});
+    '--mute-audio',
+  ];
+  if (!headless) {
+    args.push('--window-position=-10000,-10000');
+  }
+  return chromium.launchPersistentContext('', { headless, args });
+}
+
+console.log('Launching browser with extension (headless)...');
+let context = await launchContext(true);
 
 let [background] = context.serviceWorkers();
 if (!background) {
-  background = await context.waitForEvent('serviceworker');
+  try {
+    background = await context.waitForEvent('serviceworker', { timeout: 5000 });
+  } catch {
+    console.log('Headless extension load failed, falling back to off-screen headed mode...');
+    await context.close();
+    context = await launchContext(false);
+    [background] = context.serviceWorkers();
+    if (!background) {
+      background = await context.waitForEvent('serviceworker');
+    }
+  }
 }
 const extensionId = background.url().split('/')[2];
 console.log('Extension ID:', extensionId);
@@ -31,22 +47,6 @@ page.on('console', (m) => {
   if (m.text().includes('[quoth') || m.type() === 'error') console.log(`[W] ${m.text()}`);
 });
 page.on('pageerror', (e) => console.log(`[W ERROR] ${e.message}`));
-
-// Track the iframe player's current time by reading the cmt= parameter
-// from the periodic stats requests the embed fires.
-const playbackTimes: number[] = [];
-page.on('request', (req) => {
-  const url = req.url();
-  if (!url.includes('/api/stats/')) return;
-  // cmt looks like "0.005:0.000,0.006:147.840" - the last ":X" is the current media time in seconds
-  const cmtMatch = url.match(/[?&]cmt=([^&]+)/);
-  if (!cmtMatch) return;
-  const segs = decodeURIComponent(cmtMatch[1]).split(',');
-  const last = segs[segs.length - 1];
-  const parts = last.split(':');
-  const t = parseFloat(parts[parts.length - 1]);
-  if (Number.isFinite(t)) playbackTimes.push(t);
-});
 
 const watchUrl = `chrome-extension://${extensionId}/watch.html?v=${videoId}&t=30`;
 console.log(`Opening watch page: ${watchUrl}`);
@@ -68,27 +68,20 @@ if (wordCount === 0) {
   process.exit(1);
 }
 
-// Click the iframe to satisfy browser autoplay gating
+// Click the iframe to satisfy browser autoplay gating (belt-and-suspenders with &mute=1)
 try {
   await page.locator('iframe').click({ timeout: 2000 });
 } catch {
   // non-fatal
 }
 
-// Wait for the iframe player to start emitting stats so we have a baseline time
-console.log('Waiting for iframe player to start...');
-const baselineDeadline = Date.now() + 15000;
-while (playbackTimes.length === 0 && Date.now() < baselineDeadline) {
-  await page.waitForTimeout(500);
-}
-if (playbackTimes.length === 0) {
-  console.log('\nSMOKE TEST FAILED: iframe player never reported playback time');
-  await page.screenshot({ path: '.output/smoke-test-watch-failure.png' });
-  await context.close();
-  process.exit(1);
-}
-const baselineTime = playbackTimes[playbackTimes.length - 1];
-console.log(`Baseline player time: ${baselineTime.toFixed(3)}s`);
+// Wait for the embed content script to start emitting time updates (first .active-word)
+console.log('Waiting for embed content script to report playback time...');
+await page.waitForSelector('.active-word', { timeout: 15000 });
+const initialActiveStart = parseInt(
+  (await page.locator('.active-word').first().getAttribute('data-start')) || '0',
+);
+console.log(`Initial .active-word data-start: ${initialActiveStart}ms`);
 
 // Click a word well past t=30 so we can detect the seek
 console.log('\n--- Click-to-seek test ---');
@@ -96,31 +89,49 @@ const targetWord = page.locator('.word').nth(500);
 const wordText = await targetWord.textContent();
 const wordStartStr = await targetWord.getAttribute('data-start');
 const wordStart = wordStartStr ? parseInt(wordStartStr) : 0;
-console.log(`Clicking word "${wordText?.trim()}" (data-start: ${wordStart}ms = ${(wordStart / 1000).toFixed(3)}s)`);
+console.log(
+  `Clicking word "${wordText?.trim()}" (data-start: ${wordStart}ms = ${(wordStart / 1000).toFixed(3)}s)`,
+);
 
-const timesBeforeClickLen = playbackTimes.length;
 await targetWord.click();
 
-// Wait for the iframe to emit stats with the new playback time
-console.log('Waiting for iframe stats after seek...');
-const seekDeadline = Date.now() + 10000;
-while (playbackTimes.length <= timesBeforeClickLen && Date.now() < seekDeadline) {
-  await page.waitForTimeout(500);
-}
-const postSeekTimes = playbackTimes.slice(timesBeforeClickLen);
-console.log(`Stats reported ${postSeekTimes.length} new playback times after click`);
+// Wait ~1s for the seek to take effect and the active-word to move near the clicked word
+await page.waitForTimeout(1000);
+const postSeekActiveStart = parseInt(
+  (await page.locator('.active-word').first().getAttribute('data-start')) || '0',
+);
+console.log(`After click+1s: .active-word data-start=${postSeekActiveStart}ms`);
 
-// After seeking, the player should report a time near the target, NOT near the baseline
-const targetSec = wordStart / 1000;
-const matched = postSeekTimes.some((t) => Math.abs(t - targetSec) < 5);
-if (!matched) {
-  console.log(`Expected player time near ${targetSec.toFixed(3)}s, got: ${postSeekTimes.map((t) => t.toFixed(3)).join(', ')}`);
-  console.log('Click-to-seek: FAILED');
+// Verify the active-word jumped to near the clicked word (within 5s)
+if (Math.abs(postSeekActiveStart - wordStart) > 5000) {
+  console.log(
+    `Click-to-seek FAILED: expected active-word near ${wordStart}ms, got ${postSeekActiveStart}ms`,
+  );
   await page.screenshot({ path: '.output/smoke-test-watch-failure.png' });
   await context.close();
   process.exit(1);
 }
-console.log(`Click-to-seek: WORKING (player reported time ~${targetSec.toFixed(3)}s)`);
+console.log(`Click-to-seek: WORKING (active-word moved to ~${postSeekActiveStart}ms)`);
+
+// Wait another 1.5s and verify the active-word advanced (live highlighting works)
+console.log('\n--- Active-word advancement test ---');
+await page.waitForTimeout(1500);
+const advancedActiveStart = parseInt(
+  (await page.locator('.active-word').first().getAttribute('data-start')) || '0',
+);
+console.log(`After +1.5s more: .active-word data-start=${advancedActiveStart}ms`);
+
+if (advancedActiveStart <= postSeekActiveStart) {
+  console.log(
+    `Active-word advancement FAILED: data-start did not advance (${postSeekActiveStart}ms -> ${advancedActiveStart}ms)`,
+  );
+  await page.screenshot({ path: '.output/smoke-test-watch-failure.png' });
+  await context.close();
+  process.exit(1);
+}
+console.log(
+  `Active-word advancement: WORKING (${postSeekActiveStart}ms -> ${advancedActiveStart}ms)`,
+);
 
 // Cache hit check: reload the page and verify transcript appears quickly
 console.log('\n--- Cache hit check ---');

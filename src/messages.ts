@@ -15,3 +15,14 @@ export type ContentMessage =
 
 // Side panel -> Content script (via background)
 export type SidePanelMessage = { type: 'seek-to'; timeMs: number } | { type: 'request-state' };
+
+// Messages sent FROM the embed content script TO the watch page
+export type EmbedMessage = {
+  type: 'embed-time-update';
+  currentTimeMs: number;
+  isPlaying: boolean;
+  durationMs: number;
+};
+
+// Messages sent FROM the watch page TO the embed content script
+export type WatchPageMessage = { type: 'embed-seek'; timeMs: number };

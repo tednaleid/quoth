@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { parseWatchParams } from '../../core/watch-url';
-  import { IFramePlayer } from '../../adapters/youtube/iframe-player';
   import { YouTubeTranscriptSource } from '../../adapters/youtube/transcript-source';
   import { ChromeStorageLocalCache } from '../../adapters/browser/chrome-storage-local-cache';
   import {
@@ -11,13 +10,13 @@
     type WordSegment,
   } from '../../core/playback-sync';
   import type { TimedWord, VideoInfo } from '../../core/types';
+  import type { EmbedMessage } from '../../messages';
   import TranscriptView from '../sidepanel/components/TranscriptView.svelte';
 
   const SEGMENT_GAP_MS = 2000;
   const params = parseWatchParams(window.location.search);
 
   let iframeEl: HTMLIFrameElement | undefined = $state();
-  let player: IFramePlayer | null = null;
   let videoInfo: VideoInfo | null = $state(null);
   let words: TimedWord[] = $state([]);
   let segments: WordSegment[] = $state([]);
@@ -29,7 +28,7 @@
   const activeSegmentIndex = $derived(findActiveSegmentIndex(segments, currentTimeMs));
 
   const embedUrl = params.videoId
-    ? `https://www.youtube.com/embed/${params.videoId}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&start=${Math.floor(params.initialTimeMs / 1000)}`
+    ? `https://www.youtube.com/embed/${params.videoId}?enablejsapi=1&mute=1&origin=${encodeURIComponent(window.location.origin)}&start=${Math.floor(params.initialTimeMs / 1000)}`
     : '';
 
   async function loadTranscript(videoId: string) {
@@ -65,33 +64,41 @@
     await cache.set(videoId, { videoInfo: meta.videoInfo, words: fetched });
   }
 
+  let embedTabId: number | null = null;
+  let embedFrameId: number | null = null;
+
   function handleSeek(timeMs: number) {
-    player?.seekTo(timeMs);
+    if (embedTabId === null || embedFrameId === null) return;
+    browser.tabs
+      .sendMessage(embedTabId, { type: 'embed-seek', timeMs }, { frameId: embedFrameId })
+      .catch(() => {});
   }
+
+  const messageListener = (
+    message: EmbedMessage,
+    sender: { tab?: { id?: number }; frameId?: number },
+  ) => {
+    if (message.type === 'embed-time-update') {
+      currentTimeMs = message.currentTimeMs;
+      if (sender?.tab?.id !== undefined && sender.frameId !== undefined) {
+        embedTabId = sender.tab.id;
+        embedFrameId = sender.frameId;
+      }
+    }
+  };
 
   onMount(() => {
     if (!iframeEl || !params.videoId) return;
-    player = new IFramePlayer({
-      postMessage: (msg) => iframeEl!.contentWindow?.postMessage(msg, '*'),
-      subscribeToMessages: (handler) => {
-        const listener = (e: MessageEvent) => {
-          if (e.source === iframeEl!.contentWindow) handler(e.data);
-        };
-        window.addEventListener('message', listener);
-        return () => window.removeEventListener('message', listener);
-      },
-    });
-    player.initialize();
-    player.onTimeUpdate((state) => {
-      currentTimeMs = state.currentTimeMs;
-    });
+
+    browser.runtime.onMessage.addListener(messageListener);
+
     loadTranscript(params.videoId).catch((err) => {
       status = `Error: ${err instanceof Error ? err.message : String(err)}`;
     });
   });
 
   onDestroy(() => {
-    player?.destroy();
+    browser.runtime.onMessage.removeListener(messageListener);
   });
 </script>
 
