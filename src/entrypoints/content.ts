@@ -1,4 +1,5 @@
 import { YouTubeTranscriptSource } from '../adapters/youtube/transcript-source';
+import { YouTubeVideoPlayer } from '../adapters/youtube/video-player';
 import { extractVideoId } from '../core/youtube';
 import type { ContentMessage, SidePanelMessage } from '../messages';
 
@@ -6,16 +7,7 @@ export default defineContentScript({
   matches: ['*://*.youtube.com/watch*'],
   main() {
     let currentVideoId: string | null = null;
-    let timeUpdateInterval: ReturnType<typeof setInterval> | null = null;
-
-    function getYouTubePlayer(): HTMLVideoElement | null {
-      return document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
-    }
-
-    // Seek via the main-world player script (uses YouTube's seekTo API)
-    function seekYouTubePlayer(timeSeconds: number) {
-      window.postMessage({ type: 'quoth-seek', timeSeconds }, '*');
-    }
+    let stopTimeUpdates: (() => void) | null = null;
 
     function sendMessage(message: ContentMessage) {
       browser.runtime.sendMessage(message).catch(() => {});
@@ -23,25 +15,11 @@ export default defineContentScript({
 
     const transcriptSource = new YouTubeTranscriptSource();
 
-    function startTimeUpdates() {
-      stopTimeUpdates();
-      timeUpdateInterval = setInterval(() => {
-        const player = getYouTubePlayer();
-        if (!player) return;
-        sendMessage({
-          type: 'time-update',
-          currentTimeMs: Math.round(player.currentTime * 1000),
-          isPlaying: !player.paused,
-        });
-      }, 250);
-    }
-
-    function stopTimeUpdates() {
-      if (timeUpdateInterval) {
-        clearInterval(timeUpdateInterval);
-        timeUpdateInterval = null;
-      }
-    }
+    const player = new YouTubeVideoPlayer({
+      getVideoElement: () =>
+        document.querySelector('video.html5-main-video') as HTMLVideoElement | null,
+      postSeek: (timeSeconds) => window.postMessage({ type: 'quoth-seek', timeSeconds }, '*'),
+    });
 
     async function handleVideoPage() {
       const videoId = extractVideoId(window.location.href);
@@ -79,12 +57,19 @@ export default defineContentScript({
         });
       }
 
-      startTimeUpdates();
+      if (stopTimeUpdates) stopTimeUpdates();
+      stopTimeUpdates = player.onTimeUpdate((state) => {
+        sendMessage({
+          type: 'time-update',
+          currentTimeMs: state.currentTimeMs,
+          isPlaying: state.isPlaying,
+        });
+      });
     }
 
     browser.runtime.onMessage.addListener((message: SidePanelMessage) => {
       if (message.type === 'seek-to') {
-        seekYouTubePlayer(message.timeMs / 1000);
+        player.seekTo(message.timeMs);
       }
       if (message.type === 'request-state') {
         currentVideoId = null;
