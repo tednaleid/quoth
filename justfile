@@ -71,6 +71,11 @@ smoke-test-firefox:
     just build
     bun run tools/smoke-test-firefox.ts
 
+# Watch-page smoke test: load watch.html directly and verify transcript + click-to-seek
+smoke-test-watch *VIDEO_ID:
+    just build chrome
+    bun run tools/smoke-test-watch.ts {{VIDEO_ID}}
+
 # Debug Firefox extension: load built extension, navigate to YouTube, log all console output
 debug-firefox *URL:
     just build

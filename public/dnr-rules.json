@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [{ "header": "origin", "operation": "remove" }]
+    },
+    "condition": {
+      "urlFilter": "||youtube.com/youtubei/v1/",
+      "excludedInitiatorDomains": ["youtube.com", "youtube-nocookie.com", "google.com"],
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "header": "referer", "operation": "set", "value": "https://quoth.local/" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||youtube",
+      "excludedInitiatorDomains": ["youtube.com", "youtube-nocookie.com", "google.com"],
+      "resourceTypes": ["sub_frame", "xmlhttprequest", "script", "image", "media", "ping", "other"]
+    }
+  }
+]
