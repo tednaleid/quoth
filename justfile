@@ -41,9 +41,10 @@ typecheck *ARGS:
 build BROWSER="firefox":
     bunx wxt build --browser {{BROWSER}}
 
-# Start dev mode with HMR (default: firefox, or specify: just dev chrome)
-dev BROWSER="firefox":
-    bunx wxt --browser {{BROWSER}}
+# Start dev mode with HMR (default: firefox, optionally open a URL: just dev firefox 'https://youtube.com/watch?v=...')
+# Note: URL with ? or & must be quoted in the shell
+dev BROWSER="firefox" URL="":
+    QUOTH_START_URL={{URL}} bunx wxt --browser {{BROWSER}}
 
 # Clean build artifacts and caches
 clean:
@@ -65,6 +66,11 @@ smoke-test *URL:
 smoke-test-firefox:
     just build
     bun run tools/smoke-test-firefox.ts
+
+# Debug Firefox extension: load built extension, navigate to YouTube, log all console output
+debug-firefox *URL:
+    just build
+    bun run tools/debug-firefox.ts {{URL}}
 
 # Run model comparison harness (Phase 4+)
 model-bench *ARGS:
