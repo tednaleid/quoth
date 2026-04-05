@@ -160,3 +160,49 @@ describe('IFramePlayer state updates', () => {
     expect(player.getState().currentTimeMs).toBe(0);
   });
 });
+
+describe('IFramePlayer.onTimeUpdate', () => {
+  it('fires callback when infoDelivery arrives', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    const cb = vi.fn();
+    player.onTimeUpdate(cb);
+    deps.fireMessage(JSON.stringify({ event: 'infoDelivery', info: { currentTime: 3 } }));
+    expect(cb).toHaveBeenCalledOnce();
+    expect(cb).toHaveBeenCalledWith({ currentTimeMs: 3000, isPlaying: false, durationMs: 0 });
+  });
+
+  it('fires multiple registered callbacks', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    const cb1 = vi.fn();
+    const cb2 = vi.fn();
+    player.onTimeUpdate(cb1);
+    player.onTimeUpdate(cb2);
+    deps.fireMessage(JSON.stringify({ event: 'infoDelivery', info: { currentTime: 1 } }));
+    expect(cb1).toHaveBeenCalledOnce();
+    expect(cb2).toHaveBeenCalledOnce();
+  });
+
+  it('returns a cleanup function that unregisters the callback', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    const cb = vi.fn();
+    const unsub = player.onTimeUpdate(cb);
+    unsub();
+    deps.fireMessage(JSON.stringify({ event: 'infoDelivery', info: { currentTime: 1 } }));
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it('destroy() unsubscribes the message handler', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    expect(deps.isSubscribed()).toBe(true);
+    player.destroy();
+    expect(deps.isSubscribed()).toBe(false);
+  });
+});
