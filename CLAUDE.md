@@ -32,8 +32,19 @@ Hexagonal (ports and adapters). See `docs/spec/design.md` for full spec.
 ## Extension entry points
 
 - `src/entrypoints/sidepanel/` -- Svelte 5 side panel UI
-- `src/entrypoints/content.ts` -- YouTube content script
+- `src/entrypoints/content.ts` -- YouTube content script (isolated world)
+- `src/entrypoints/youtube-player.content.ts` -- YouTube player control (main world)
 - `src/entrypoints/background.ts` -- Service worker message router
+
+## Known issues
+
+- `just dev` opens Chrome with a fresh WXT profile where YouTube's video player
+  cannot seek to unbuffered regions (shows "Something went wrong"). This is a
+  YouTube/fresh-profile issue, not a Quoth bug. Production builds loaded via
+  `chrome://extensions` in a regular Chrome profile work correctly. Automated
+  Playwright tests also work (seeking confirmed to 25+ minutes).
+- To test in a regular profile: `just build`, then load `.output/chrome-mv3/`
+  as an unpacked extension in `chrome://extensions`.
 
 ## Interactive debugging
 
