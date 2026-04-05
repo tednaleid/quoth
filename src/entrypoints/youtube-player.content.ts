@@ -15,7 +15,6 @@ export default defineContentScript({
         const player = document.querySelector('#movie_player') as any;
         if (player?.seekTo) {
           player.seekTo(event.data.timeSeconds, true);
-          player.playVideo();
         }
       }
     });

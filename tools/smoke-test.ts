@@ -53,7 +53,25 @@ await context.addCookies([
 
 console.log('Navigating to YouTube:', videoUrl);
 await ytPage.goto(videoUrl, { waitUntil: 'load', timeout: 30000 });
-await ytPage.waitForTimeout(5000);
+await ytPage.waitForTimeout(3000);
+
+// Start the video playing (like a real user would)
+console.log('Starting video playback...');
+const playResult = await ytPage.evaluate(() => {
+  const player = document.querySelector('#movie_player') as any;
+  if (player?.playVideo) {
+    player.playVideo();
+    return 'played via API';
+  }
+  const video = document.querySelector('video') as HTMLVideoElement | null;
+  if (video) {
+    video.play().catch(() => {});
+    return 'played via video element';
+  }
+  return 'no player found';
+});
+console.log('Play result:', playResult);
+await ytPage.waitForTimeout(3000);
 
 // Run investigation directly in page context
 const investigation = await ytPage.evaluate(async () => {
@@ -141,9 +159,12 @@ if (hasTranscript && wordCount > 0) {
   );
   console.log(`First words: ${first5.join(', ')}`);
 
-  // Test click-to-seek on a nearby word
-  console.log('\n--- Click-to-seek test ---');
-  const targetWord = sidePanelPage.locator('.word').nth(4);
+  // Test click-to-seek -- try a very far word (4000th word, well into the video)
+  console.log('\n--- Click-to-seek test (far seek) ---');
+  // Try the last 100th word (near the end of the video)
+  const totalWords = await sidePanelPage.locator('.word').count();
+  console.log(`Total words: ${totalWords}`);
+  const targetWord = sidePanelPage.locator('.word').nth(totalWords - 100);
   const wordText = await targetWord.textContent();
   const wordStart = await targetWord.getAttribute('data-start');
   console.log(`Clicking word "${wordText?.trim()}" (data-start: ${wordStart}ms)`);
