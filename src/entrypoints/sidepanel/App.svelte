@@ -39,21 +39,10 @@
     }
   }
 
-  // Track latest currentTimeMs from time-update messages for pop-out
-  let currentTimeMs = $state(0);
-
-  // Update currentTimeMs whenever a time-update message arrives. We piggyback
-  // on the handleMessage call by also inspecting the incoming message here.
-  browser.runtime.onMessage.addListener((message: ContentMessage, sender) => {
-    if (sender.tab?.id && sender.tab.id === youtubeTabId && message.type === 'time-update') {
-      currentTimeMs = message.currentTimeMs;
-    }
-  });
-
   function handlePopOut() {
     const videoId = state.videoInfo?.videoId;
     if (!videoId) return;
-    const seconds = Math.floor(currentTimeMs / 1000);
+    const seconds = Math.floor(state.currentTimeMs / 1000);
     const url = browser.runtime.getURL(`watch.html?v=${videoId}&t=${seconds}`);
     browser.tabs.create({ url });
   }

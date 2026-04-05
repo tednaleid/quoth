@@ -12,7 +12,12 @@
 <header>
   <h1>{title || 'Quoth'}</h1>
   <div class="controls">
-    <button class="toggle" onclick={onPopOut} disabled={!canPopOut} title="Open in full tab">
+    <button
+      class="toggle"
+      onclick={onPopOut}
+      disabled={!canPopOut}
+      title={canPopOut ? 'Open in full tab' : 'No video loaded'}
+    >
       ⇱
     </button>
     <button

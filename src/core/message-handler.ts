@@ -20,6 +20,7 @@ export interface TranscriptState {
   segments: WordSegment[];
   activeWordIndex: number;
   activeSegmentIndex: number;
+  currentTimeMs: number;
   status: string;
 }
 
@@ -30,6 +31,7 @@ export function createInitialState(): TranscriptState {
     segments: [],
     activeWordIndex: -1,
     activeSegmentIndex: -1,
+    currentTimeMs: 0,
     status: 'Open a YouTube video to see its transcript.',
   };
 }
@@ -52,9 +54,10 @@ export function handleMessage(state: TranscriptState, message: ContentMessage): 
       return createInitialState();
 
     case 'time-update':
-      if (state.words.length === 0) return state;
+      if (state.words.length === 0) return { ...state, currentTimeMs: message.currentTimeMs };
       return {
         ...state,
+        currentTimeMs: message.currentTimeMs,
         activeWordIndex: findActiveWordIndex(state.words, message.currentTimeMs),
         activeSegmentIndex: findActiveSegmentIndex(state.segments, message.currentTimeMs),
       };
