@@ -58,12 +58,7 @@ Three ways to verify the extension works, in increasing order of realism:
 
 ## Known issues
 
-- **`just dev chrome` seeking:** YouTube's player cannot seek past unbuffered
-  regions when running in WXT's dev mode Chrome profile, showing "Something
-  went wrong" around the 1-2 minute mark. This is a YouTube/profile issue,
-  not a Quoth bug. Use `just smoke-test` (Playwright profile) or production
-  builds loaded in a regular Chrome profile for seeking verification.
-  **Workaround:** use Firefox (`just dev`) which doesn't have this issue.
+See `docs/spec/known-issues.md` for current issues and workarounds.
 
 ## Interactive debugging
 
