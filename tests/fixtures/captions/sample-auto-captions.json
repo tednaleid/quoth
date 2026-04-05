@@ -1,0 +1,35 @@
+{
+  "events": [
+    {
+      "tStartMs": 1040,
+      "dDurationMs": 3360,
+      "segs": [
+        {"utf8": "welcome"},
+        {"tOffsetMs": 320, "utf8": " to"},
+        {"tOffsetMs": 560, "utf8": " the"},
+        {"tOffsetMs": 799, "utf8": " show"}
+      ]
+    },
+    {
+      "tStartMs": 5000,
+      "dDurationMs": 2500,
+      "segs": [
+        {"utf8": "today"},
+        {"tOffsetMs": 400, "utf8": " we"},
+        {"tOffsetMs": 700, "utf8": " are"},
+        {"tOffsetMs": 1000, "utf8": " going"},
+        {"tOffsetMs": 1400, "utf8": " to"},
+        {"tOffsetMs": 1600, "utf8": " talk"}
+      ]
+    },
+    {
+      "tStartMs": 8500,
+      "dDurationMs": 3000,
+      "segs": [
+        {"utf8": "about"},
+        {"tOffsetMs": 300, "utf8": " something"},
+        {"tOffsetMs": 800, "utf8": " interesting"}
+      ]
+    }
+  ]
+}

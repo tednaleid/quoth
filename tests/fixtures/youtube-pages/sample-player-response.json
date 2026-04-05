@@ -1,0 +1,27 @@
+{
+  "videoDetails": {
+    "videoId": "YwZR6tc7qYg",
+    "title": "Everything We Got Wrong About Research-Plan-Implement",
+    "lengthSeconds": "2723",
+    "channelId": "UCtest",
+    "shortDescription": "Test description",
+    "author": "Test Channel"
+  },
+  "captions": {
+    "playerCaptionsTracklistRenderer": {
+      "captionTracks": [
+        {
+          "baseUrl": "https://www.youtube.com/api/timedtext?v=YwZR6tc7qYg&lang=en&fmt=json3",
+          "name": { "simpleText": "English" },
+          "languageCode": "en",
+          "kind": "asr"
+        },
+        {
+          "baseUrl": "https://www.youtube.com/api/timedtext?v=YwZR6tc7qYg&lang=es",
+          "name": { "simpleText": "Spanish" },
+          "languageCode": "es"
+        }
+      ]
+    }
+  }
+}

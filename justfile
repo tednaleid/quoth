@@ -59,13 +59,17 @@ install-hooks:
     @chmod +x .git/hooks/pre-commit
     @echo "Pre-commit hook installed."
 
+# Smoke test: load extension and navigate to YouTube
+smoke-test *URL:
+    bun run tools/smoke-test.ts {{URL}}
+
 # Run model comparison harness (Phase 4+)
 model-bench *ARGS:
     @echo "Model bench not yet implemented (Phase 4)"
 
-# Capture YouTube page fixture for testing (Phase 2+)
-fixture-capture URL:
-    @echo "Fixture capture not yet implemented (Phase 2)"
+# Capture YouTube page fixture for testing
+fixture-capture URL *NAME:
+    bun run tools/fixture-capture.ts "{{URL}}" {{NAME}}
 
 # Bump version, generate release notes, tag, and push (Phase 6+)
 bump VERSION:

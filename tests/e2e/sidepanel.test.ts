@@ -25,13 +25,13 @@ test.describe('Side Panel', () => {
     await context?.close();
   });
 
-  test('side panel page renders with expected content', async () => {
+  test('side panel page renders with header and placeholder', async () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
     await expect(page.locator('h1')).toHaveText('Quoth');
-    await expect(page.locator('.status-bar')).toContainText('Ready');
-    await expect(page.locator('.transcript-placeholder')).toContainText(
+    await expect(page.locator('.status-bar')).toBeVisible();
+    await expect(page.locator('.placeholder')).toContainText(
       'Open a YouTube video to see its transcript.',
     );
 

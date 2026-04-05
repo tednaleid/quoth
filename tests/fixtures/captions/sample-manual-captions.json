@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "tStartMs": 1040,
+      "dDurationMs": 3360,
+      "segs": [{"utf8": "Welcome to the show."}]
+    },
+    {
+      "tStartMs": 5000,
+      "dDurationMs": 2500,
+      "segs": [{"utf8": "Today we are going to talk"}]
+    },
+    {
+      "tStartMs": 8500,
+      "dDurationMs": 3000,
+      "segs": [{"utf8": "about something interesting."}]
+    }
+  ]
+}
