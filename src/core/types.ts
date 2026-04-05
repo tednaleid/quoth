@@ -10,27 +10,6 @@ export interface TimedWord {
   original: string;
 }
 
-export interface ParagraphBreak {
-  wordIndex: number;
-  startTime: number;
-}
-
-export interface Section {
-  title: string;
-  paragraphIndex: number;
-  startTime: number;
-}
-
-export type FormattingTier = 0 | 1 | 2 | 3;
-
-export interface TimedTranscript {
-  videoId: string;
-  words: TimedWord[];
-  formattingTier: FormattingTier;
-  paragraphs: ParagraphBreak[];
-  sections: Section[];
-}
-
 export interface VideoInfo {
   videoId: string;
   title: string;
