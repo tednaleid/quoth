@@ -22,6 +22,11 @@ export default defineContentScript({
       return document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
     }
 
+    // Seek via the main-world player script (uses YouTube's seekTo API)
+    function seekYouTubePlayer(timeSeconds: number) {
+      window.postMessage({ type: 'quoth-seek', timeSeconds }, '*');
+    }
+
     function sendMessage(message: ContentMessage) {
       browser.runtime.sendMessage(message).catch(() => {});
     }
@@ -109,10 +114,7 @@ export default defineContentScript({
 
     browser.runtime.onMessage.addListener((message: SidePanelMessage) => {
       if (message.type === 'seek-to') {
-        const player = getYouTubePlayer();
-        if (player) {
-          player.currentTime = message.timeMs / 1000;
-        }
+        seekYouTubePlayer(message.timeMs / 1000);
       }
       if (message.type === 'request-state') {
         currentVideoId = null;
