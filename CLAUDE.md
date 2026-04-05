@@ -24,6 +24,9 @@ All commits should pass `just check`. After refactoring browser integration
 code, also run `just smoke-test` -- unit tests can miss cross-browser bugs
 (e.g., fetch binding issues caught only by the Chromium smoke test).
 
+See `docs/spec/testing-strategy.md` for what each test layer covers, which
+bug classes each one catches, and when to run which.
+
 ## Architecture
 
 Hexagonal (ports and adapters). See `docs/spec/design.md` and `docs/spec/architecture.md`.
