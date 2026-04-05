@@ -83,22 +83,51 @@
     sendToContent({ type: 'seek-to', timeMs });
   }
 
-  // Listen for messages from content script (via background)
+  // Only handle messages from the tab we're connected to
   browser.runtime.onMessage.addListener((message: ContentMessage, sender) => {
-    // Track which tab the content script is on
-    if (sender.tab?.id) {
-      youtubeTabId = sender.tab.id;
+    if (sender.tab?.id && sender.tab.id === youtubeTabId) {
+      handleMessage(message);
     }
-    handleMessage(message);
   });
 
-  // On startup, find the YouTube tab and request its state
-  findYouTubeTab().then((tabId) => {
-    if (tabId) {
-      youtubeTabId = tabId;
-      sendToContent({ type: 'request-state' });
+  // When the user switches tabs, connect to the new active YouTube tab
+  browser.tabs.onActivated.addListener(async (activeInfo) => {
+    const tab = await browser.tabs.get(activeInfo.tabId);
+    if (tab.url?.match(/youtube\.com\/watch/)) {
+      if (tab.id !== youtubeTabId) {
+        youtubeTabId = tab.id!;
+        // Reset state and request transcript from the new tab
+        words = [];
+        segments = [];
+        videoInfo = null;
+        activeWordIndex = -1;
+        activeSegmentIndex = -1;
+        status = 'Loading...';
+        sendToContent({ type: 'request-state' });
+      }
     }
   });
+
+  // On startup, find the active YouTube tab (or first available)
+  async function connectToYouTubeTab() {
+    // Prefer the active tab if it's YouTube
+    const [activeTab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+      url: '*://*.youtube.com/watch*',
+    });
+    if (activeTab?.id) {
+      youtubeTabId = activeTab.id;
+    } else {
+      // Fall back to any YouTube tab
+      youtubeTabId = await findYouTubeTab();
+    }
+    if (youtubeTabId) {
+      sendToContent({ type: 'request-state' });
+    }
+  }
+
+  connectToYouTubeTab();
 </script>
 
 <main>
