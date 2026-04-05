@@ -4,8 +4,11 @@
  */
 import type { SidebarHost } from '../ports/sidebar-host';
 import { ChromeSidebarHost } from './chrome/sidebar-host';
+import { FirefoxSidebarHost } from './firefox/sidebar-host';
 
-export function createSidebarHost(_browser: string): SidebarHost {
-  // Firefox adapter added in Task 2
+export function createSidebarHost(browser: string): SidebarHost {
+  if (browser === 'firefox') {
+    return new FirefoxSidebarHost();
+  }
   return new ChromeSidebarHost();
 }
