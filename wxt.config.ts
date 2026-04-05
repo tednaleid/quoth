@@ -5,6 +5,10 @@ export default defineConfig({
   modules: ['@wxt-dev/module-svelte'],
   webExt: {
     startUrls: process.env.QUOTH_START_URL ? [process.env.QUOTH_START_URL] : undefined,
+    // Persistent profiles so cookies, consent popups, and ad state carry across dev runs
+    firefoxProfile: '.wxt/profiles/firefox',
+    chromiumProfile: '.wxt/profiles/chrome',
+    keepProfileChanges: true,
   },
   manifest: {
     name: 'Quoth',

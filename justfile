@@ -46,9 +46,13 @@ build BROWSER="firefox":
 dev BROWSER="firefox" URL="":
     QUOTH_START_URL={{URL}} bunx wxt --browser {{BROWSER}}
 
-# Clean build artifacts and caches
+# Clean build artifacts and caches (also clears dev browser profiles)
 clean:
     rm -rf .output .wxt node_modules/.vite
+
+# Clean just the dev browser profiles (keeps build output; clears cookies, consent, cached state)
+clean-profiles:
+    rm -rf .wxt/profiles
 
 # Install git pre-commit hook
 install-hooks:

@@ -77,7 +77,7 @@
   }
 
   .segment.active {
-    background: rgba(100, 150, 255, 0.08);
+    background: rgba(100, 150, 255, 0.15);
   }
 
   .timestamp {
@@ -103,6 +103,8 @@
   }
 
   .active-word {
-    background: rgba(100, 150, 255, 0.2);
+    background: #ffd54f;
+    color: #1a1a2e;
+    font-weight: 600;
   }
 </style>
