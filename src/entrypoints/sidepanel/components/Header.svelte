@@ -3,13 +3,18 @@
     title: string;
     autoScroll: boolean;
     onToggleAutoScroll: () => void;
+    onPopOut: () => void;
+    canPopOut: boolean;
   }
-  let { title, autoScroll, onToggleAutoScroll }: Props = $props();
+  let { title, autoScroll, onToggleAutoScroll, onPopOut, canPopOut }: Props = $props();
 </script>
 
 <header>
   <h1>{title || 'Quoth'}</h1>
   <div class="controls">
+    <button class="toggle" onclick={onPopOut} disabled={!canPopOut} title="Open in full tab">
+      ⇱
+    </button>
     <button
       class="toggle"
       class:active={autoScroll}
@@ -56,5 +61,9 @@
   .toggle.active {
     color: #aac;
     border-color: #446;
+  }
+  .toggle:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 </style>
