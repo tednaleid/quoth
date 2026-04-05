@@ -200,3 +200,86 @@ distribution of segment duration across words).
 **WordSegment** groups consecutive words with small gaps (<2 seconds) into
 visual paragraphs. These map to YouTube's original caption event boundaries
 and provide the paragraph-level timestamps shown in the transcript.
+
+---
+
+## Sidebar Mode vs Tab Mode
+
+The side panel page (`sidepanel.html`) is a standalone Svelte app that works
+in two modes. The same HTML/JS runs in both -- it discovers the YouTube tab
+via `browser.tabs.query` and communicates via extension messaging regardless
+of how it's rendered.
+
+```mermaid
+graph TB
+    subgraph "Sidebar Mode (default)"
+        direction LR
+        YT1["YouTube Tab<br/>(active tab)"]
+        SP1["Chrome Side Panel<br/>Docked alongside tab<br/>~350px wide"]
+        YT1 --- SP1
+    end
+
+    subgraph "Tab Mode (pop-out)"
+        direction LR
+        YT2["YouTube Tab<br/>(Tab 1)"]
+        SP2["Transcript Tab<br/>(Tab 2, full width)<br/>chrome-extension://&lt;id&gt;/sidepanel.html"]
+    end
+
+    SP1 -. "Same code,<br/>same messaging" .-> SP2
+```
+
+### How tab mode works
+
+The side panel app finds the YouTube tab by querying for matching URLs:
+
+```typescript
+const [ytTab] = await browser.tabs.query({ url: '*://*.youtube.com/watch*' });
+if (ytTab?.id) {
+  browser.tabs.sendMessage(ytTab.id, { type: 'request-state' });
+}
+```
+
+This works identically whether the app runs as a Chrome side panel or as a
+standalone tab. The content script on the YouTube page doesn't know or care
+which mode the side panel is in -- it receives the same messages and responds
+the same way.
+
+### Opening tab mode manually
+
+1. Find the extension ID: go to `chrome://extensions`, find Quoth, copy the ID
+2. Open a new tab to: `chrome-extension://<extension-id>/sidepanel.html`
+3. Navigate to a YouTube video in another tab
+4. The transcript loads and syncs automatically
+
+### Opening tab mode programmatically
+
+From any extension context (background script, side panel, popup):
+
+```typescript
+browser.tabs.create({
+  url: browser.runtime.getURL('sidepanel.html'),
+});
+```
+
+This is what the smoke test does via Playwright, and what a "pop out to tab"
+button in the side panel header would do.
+
+### What tab mode gives you
+
+| Feature | Sidebar | Tab |
+|---------|---------|-----|
+| Video + transcript visible at once | Yes (side by side) | No (tab switch) |
+| Transcript width | ~350px fixed | Full tab width |
+| Native Ctrl+F search | No (panel) | Yes (browser search) |
+| Text selection + copy | Awkward in narrow panel | Full browser support |
+| Separate window | No | Yes (drag tab out) |
+| Bookmarkable | No | Yes |
+| Playwright testable | No (no API to open side panel) | Yes (full DOM access) |
+
+### Automated testing uses tab mode
+
+Playwright cannot programmatically open Chrome's side panel (no API exists).
+The smoke test (`just smoke-test`) opens `sidepanel.html` as a regular tab,
+which gives Playwright full DOM access for clicking words, reading transcript
+content, and verifying seek behavior. This is functionally identical to sidebar
+mode because the same code and messaging paths are used.
