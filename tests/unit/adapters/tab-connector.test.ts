@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fakeBrowser } from 'wxt/testing';
-import { setupTabConnector } from '../../../src/core/tab-connector';
+import { setupTabConnector } from '../../../src/adapters/browser/tab-connector';
 
 beforeEach(() => {
   fakeBrowser.reset();

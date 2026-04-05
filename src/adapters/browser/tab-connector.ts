@@ -3,7 +3,7 @@
  * ABOUTME: Finds the active YouTube tab on startup and tracks tab activations.
  */
 
-import type { SidePanelMessage } from '../messages';
+import type { SidePanelMessage } from '../../messages';
 
 export interface TabConnectorCallbacks {
   onConnect: (tabId: number) => void;

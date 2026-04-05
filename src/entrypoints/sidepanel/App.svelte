@@ -4,7 +4,7 @@
     handleMessage,
     type TranscriptState,
   } from '../../core/message-handler';
-  import { setupTabConnector } from '../../core/tab-connector';
+  import { setupTabConnector } from '../../adapters/browser/tab-connector';
   import type { ContentMessage, SidePanelMessage } from '../../messages';
   import Header from './components/Header.svelte';
   import StatusBar from './components/StatusBar.svelte';
