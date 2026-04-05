@@ -1,14 +1,9 @@
 /**
- * ABOUTME: Tab discovery and switching logic for the side panel.
- * ABOUTME: Finds the active YouTube tab on startup and tracks tab activations.
+ * ABOUTME: Tab discovery and switching logic for the side panel -- uses browser.tabs.
+ * ABOUTME: Implements the TabConnector port (src/ports/tab-connector.ts).
  */
 
-import type { SidePanelMessage } from '../../messages';
-
-export interface TabConnectorCallbacks {
-  onConnect: (tabId: number) => void;
-  sendMessage?: (tabId: number, message: SidePanelMessage) => void;
-}
+import type { TabConnector, TabConnectorCallbacks } from '../../ports/tab-connector';
 
 const YOUTUBE_WATCH_PATTERN = /youtube\.com\/watch/;
 
@@ -35,7 +30,7 @@ function notifyConnect(tabId: number, callbacks: TabConnectorCallbacks): void {
   }
 }
 
-export async function setupTabConnector(callbacks: TabConnectorCallbacks): Promise<() => void> {
+export const setupTabConnector: TabConnector = async (callbacks: TabConnectorCallbacks) => {
   let connectedTabId: number | null = null;
 
   const onActivated = async (activeInfo: { tabId: number; windowId: number }) => {
@@ -66,4 +61,4 @@ export async function setupTabConnector(callbacks: TabConnectorCallbacks): Promi
   return () => {
     browser.tabs.onActivated.removeListener(onActivated);
   };
-}
+};
