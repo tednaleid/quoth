@@ -54,9 +54,8 @@
           data-end={word.end}
           onclick={() => onSeek(word.start)}
           role="button"
-          tabindex="-1"
-          >{word.text}
-        </span>
+          tabindex="-1">{word.text + ' '}</span
+        >
       {/each}
     </p>
   {/each}

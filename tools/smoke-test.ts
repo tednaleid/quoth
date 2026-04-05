@@ -140,6 +140,36 @@ if (hasTranscript && wordCount > 0) {
     (els) => els.slice(0, 5).map((e) => e.textContent?.trim()),
   );
   console.log(`First words: ${first5.join(', ')}`);
+
+  // Test click-to-seek on a nearby word
+  console.log('\n--- Click-to-seek test ---');
+  const targetWord = sidePanelPage.locator('.word').nth(4);
+  const wordText = await targetWord.textContent();
+  const wordStart = await targetWord.getAttribute('data-start');
+  console.log(`Clicking word "${wordText?.trim()}" (data-start: ${wordStart}ms)`);
+
+  const timeBefore = await ytPage.evaluate(() => {
+    const video = document.querySelector('video') as HTMLVideoElement | null;
+    return video ? Math.round(video.currentTime * 1000) : null;
+  });
+  console.log(`Video time before: ${timeBefore}ms`);
+
+  await targetWord.click();
+  await ytPage.waitForTimeout(2000);
+
+  const timeAfter = await ytPage.evaluate(() => {
+    const video = document.querySelector('video') as HTMLVideoElement | null;
+    return video ? Math.round(video.currentTime * 1000) : null;
+  });
+  console.log(`Video time after: ${timeAfter}ms`);
+
+  if (wordStart && timeAfter !== null) {
+    const expected = parseInt(wordStart);
+    const diff = Math.abs(timeAfter - expected);
+    console.log(`Expected: ~${expected}ms, Got: ${timeAfter}ms, Diff: ${diff}ms`);
+    console.log(diff < 5000 ? 'Click-to-seek: WORKING' : 'Click-to-seek: MISMATCH');
+  }
+
   console.log('\n=== SMOKE TEST PASSED ===');
 } else {
   console.log('\n=== NEEDS INVESTIGATION ===');
