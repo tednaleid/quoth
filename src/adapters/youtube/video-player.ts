@@ -28,8 +28,8 @@ export class YouTubeVideoPlayer implements VideoPlayer {
 
   onTimeUpdate(callback: (state: VideoPlayerState) => void): () => void {
     const interval = setInterval(() => {
-      const state = this.getState();
-      callback(state);
+      if (!this.deps.getVideoElement()) return;
+      callback(this.getState());
     }, 250);
     return () => clearInterval(interval);
   }

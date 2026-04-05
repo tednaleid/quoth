@@ -20,17 +20,17 @@ test-watch *ARGS:
 test-e2e: build
     bunx playwright test
 
-# Run linter
-lint:
-    bunx eslint src/ tests/
+# Run linter (optionally pass specific files, e.g. just lint src/core/types.ts)
+lint *ARGS:
+    {{ if ARGS == "" { "bunx eslint src/ tests/" } else { "bunx eslint " + ARGS } }}
 
-# Run formatter
-fmt:
-    bunx prettier --write "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"
+# Run formatter (optionally pass specific files, e.g. just fmt src/core/types.ts)
+fmt *ARGS:
+    {{ if ARGS == "" { 'bunx prettier --write "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"' } else { "bunx prettier --write " + ARGS } }}
 
 # Check formatting without modifying files
-fmt-check:
-    bunx prettier --check "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"
+fmt-check *ARGS:
+    {{ if ARGS == "" { 'bunx prettier --check "src/**/*.{ts,svelte,html,css}" "tests/**/*.ts"' } else { "bunx prettier --check " + ARGS } }}
 
 # Run TypeScript type checking
 typecheck:

@@ -128,6 +128,19 @@ describe('YouTubeVideoPlayer.onTimeUpdate', () => {
     vi.useRealTimers();
   });
 
+  it('skips callback when no video element is present', () => {
+    vi.useFakeTimers();
+    const { player } = makePlayer(null);
+    const callback = vi.fn();
+
+    const cleanup = player.onTimeUpdate(callback);
+    vi.advanceTimersByTime(500);
+    expect(callback).not.toHaveBeenCalled();
+
+    cleanup();
+    vi.useRealTimers();
+  });
+
   it('returns a cleanup function', () => {
     vi.useFakeTimers();
     const { player } = makePlayer(mockVideo());
