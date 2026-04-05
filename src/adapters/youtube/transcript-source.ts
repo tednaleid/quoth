@@ -2,8 +2,8 @@
  * ABOUTME: YouTubeTranscriptSource adapter - fetches video info and captions via the Innertube ANDROID API.
  * ABOUTME: Implements the TranscriptSource port using dependency-injected fetch for testability.
  */
-import type { TranscriptSource } from '../../ports/transcript-source';
-import type { VideoInfo, CaptionTrack, TimedWord } from '../../core/types';
+import type { TranscriptSource, VideoMetadata } from '../../ports/transcript-source';
+import type { CaptionTrack, TimedWord } from '../../core/types';
 import { extractVideoInfo, extractCaptionTracks } from './innertube';
 import { parseJson3Captions } from '../../core/caption-parser';
 
@@ -36,16 +36,13 @@ export class YouTubeTranscriptSource implements TranscriptSource {
     return response.json();
   }
 
-  async getVideoInfo(videoId: string): Promise<VideoInfo | null> {
+  async getVideoMetadata(videoId: string): Promise<VideoMetadata> {
     const playerResponse = await this.fetchPlayerResponse(videoId);
-    if (!playerResponse) return null;
-    return extractVideoInfo(playerResponse);
-  }
-
-  async getCaptionTracks(videoId: string): Promise<CaptionTrack[]> {
-    const playerResponse = await this.fetchPlayerResponse(videoId);
-    if (!playerResponse) return [];
-    return extractCaptionTracks(playerResponse);
+    if (!playerResponse) return { videoInfo: null, captionTracks: [] };
+    return {
+      videoInfo: extractVideoInfo(playerResponse),
+      captionTracks: extractCaptionTracks(playerResponse),
+    };
   }
 
   async fetchTranscript(captionTrack: CaptionTrack): Promise<TimedWord[]> {

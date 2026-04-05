@@ -8,13 +8,13 @@ default:
 # Run all checks: tests, linting, typecheck, format check
 check: test lint typecheck fmt-check
 
-# Run unit tests
-test:
-    bunx vitest run
+# Run unit tests (optionally pass a file pattern, e.g. just test message-handler)
+test *ARGS:
+    bunx vitest run {{ARGS}}
 
 # Run unit tests in watch mode
-test-watch:
-    bunx vitest
+test-watch *ARGS:
+    bunx vitest {{ARGS}}
 
 # Run E2E tests (requires built extension)
 test-e2e: build

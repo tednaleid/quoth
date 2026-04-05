@@ -48,8 +48,7 @@ export default defineContentScript({
       if (!videoId || videoId === currentVideoId) return;
       currentVideoId = videoId;
 
-      const videoInfo = await transcriptSource.getVideoInfo(videoId);
-      const captionTracks = await transcriptSource.getCaptionTracks(videoId);
+      const { videoInfo, captionTracks } = await transcriptSource.getVideoMetadata(videoId);
 
       if (videoInfo) {
         sendMessage({
