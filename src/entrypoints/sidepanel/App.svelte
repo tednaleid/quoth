@@ -24,8 +24,12 @@
   });
 
   function sendToTab(tabId: number, message: SidePanelMessage) {
-    browser.tabs.sendMessage(tabId, message).catch(() => {
-      // Content script may not be loaded
+    // "Receiving end does not exist" is expected if the content script hasn't loaded yet -- swallow silently
+    browser.tabs.sendMessage(tabId, message).catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes('Receiving end does not exist')) {
+        console.warn('[quoth sidebar] tabs.sendMessage failed:', msg);
+      }
     });
   }
 

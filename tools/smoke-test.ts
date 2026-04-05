@@ -29,6 +29,9 @@ console.log('Extension ID:', extensionId);
 // Navigate to YouTube
 const pages = context.pages();
 const ytPage = pages[0] || (await context.newPage());
+ytPage.on('console', (m) => {
+  if (m.text().includes('[quoth')) console.log(`[YT] ${m.text()}`);
+});
 console.log('Navigating to YouTube:', videoUrl);
 await ytPage.goto(videoUrl, { waitUntil: 'load', timeout: 30000 });
 await ytPage.waitForTimeout(5000);
@@ -36,6 +39,11 @@ await ytPage.waitForTimeout(5000);
 // Open side panel as a tab
 console.log('Opening side panel...');
 const sidePanelPage = await context.newPage();
+sidePanelPage.on('console', (m) => {
+  if (m.text().includes('[quoth')) console.log(`[SP] ${m.text()}`);
+});
+sidePanelPage.on('pageerror', (e) => console.log(`[SP ERROR] ${e.message}`));
+
 await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 await sidePanelPage.waitForTimeout(5000);
 
@@ -51,6 +59,12 @@ console.log(`Transcript: ${hasTranscript}, Words: ${wordCount}`);
 
 if (!hasTranscript || wordCount === 0) {
   console.log('\nSMOKE TEST FAILED: No transcript loaded');
+  await sidePanelPage.screenshot({ path: '.output/smoke-test-failure.png' });
+  console.log('Screenshot saved to .output/smoke-test-failure.png');
+  // Also dump sidepanel HTML to help debug
+  const html = await sidePanelPage.content();
+  console.log('Sidepanel HTML (first 800 chars):');
+  console.log(html.slice(0, 800));
   await context.close();
   process.exit(1);
 }

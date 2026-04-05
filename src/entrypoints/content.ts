@@ -14,7 +14,13 @@ export default defineContentScript({
     let stopTimeUpdates: (() => void) | null = null;
 
     function sendMessage(message: ContentMessage) {
-      browser.runtime.sendMessage(message).catch(() => {});
+      // "Receiving end does not exist" is expected when the side panel is closed -- swallow it silently
+      browser.runtime.sendMessage(message).catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('Receiving end does not exist')) {
+          console.warn('[quoth] runtime.sendMessage failed:', msg);
+        }
+      });
     }
 
     const transcriptSource = new YouTubeTranscriptSource();
