@@ -1,11 +1,16 @@
-import { extractVideoId } from '../core/youtube';
-import {
-  extractVideoInfo,
-  extractCaptionTracks,
-  extractPlayerResponseFromHtml,
-} from '../adapters/youtube/innertube';
+import { extractVideoInfo, extractCaptionTracks } from '../adapters/youtube/innertube';
 import { parseJson3Captions } from '../core/caption-parser';
+import { extractVideoId } from '../core/youtube';
 import type { ContentMessage, SidePanelMessage } from '../messages';
+
+const INNERTUBE_URL = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
+const ANDROID_CONTEXT = {
+  client: {
+    clientName: 'ANDROID',
+    clientVersion: '20.10.38',
+  },
+};
+const ANDROID_UA = 'com.google.android.youtube/20.10.38 (Linux; U; Android 14)';
 
 export default defineContentScript({
   matches: ['*://*.youtube.com/watch*'],
@@ -18,9 +23,25 @@ export default defineContentScript({
     }
 
     function sendMessage(message: ContentMessage) {
-      browser.runtime.sendMessage(message).catch(() => {
-        // Side panel may not be open
+      browser.runtime.sendMessage(message).catch(() => {});
+    }
+
+    // Fetch player response via Innertube ANDROID client (works without page cookies)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function fetchPlayerResponse(videoId: string): Promise<any> {
+      const response = await fetch(INNERTUBE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': ANDROID_UA,
+        },
+        body: JSON.stringify({
+          context: ANDROID_CONTEXT,
+          videoId,
+        }),
       });
+      if (!response.ok) return null;
+      return response.json();
     }
 
     function startTimeUpdates() {
@@ -45,16 +66,10 @@ export default defineContentScript({
 
     async function handleVideoPage() {
       const videoId = extractVideoId(window.location.href);
-      if (videoId === currentVideoId) return;
+      if (!videoId || videoId === currentVideoId) return;
       currentVideoId = videoId;
 
-      if (!videoId) {
-        sendMessage({ type: 'video-left' });
-        stopTimeUpdates();
-        return;
-      }
-
-      const playerResponse = extractPlayerResponseFromHtml(document.documentElement.innerHTML);
+      const playerResponse = await fetchPlayerResponse(videoId);
       const videoInfo = playerResponse ? extractVideoInfo(playerResponse) : null;
       const captionTracks = playerResponse ? extractCaptionTracks(playerResponse) : [];
 
@@ -81,6 +96,12 @@ export default defineContentScript({
             error: err instanceof Error ? err.message : 'Unknown error',
           });
         }
+      } else {
+        sendMessage({
+          type: 'captions-error',
+          videoId,
+          error: 'No English captions available',
+        });
       }
 
       startTimeUpdates();

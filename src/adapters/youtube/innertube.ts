@@ -25,7 +25,10 @@ export function extractCaptionTracks(playerResponse: any): CaptionTrack[] {
 
   return trackList.map((track: any) => {
     let baseUrl = track.baseUrl ?? '';
-    if (!baseUrl.includes('fmt=json3')) {
+    // Replace any existing fmt parameter (e.g., fmt=srv3 from ANDROID client) with json3
+    if (baseUrl.includes('fmt=')) {
+      baseUrl = baseUrl.replace(/fmt=[^&]*/, 'fmt=json3');
+    } else {
       baseUrl += (baseUrl.includes('?') ? '&' : '?') + 'fmt=json3';
     }
 

@@ -38,4 +38,23 @@ describe('extractCaptionTracks', () => {
       expect(track.baseUrl).toContain('fmt=json3');
     }
   });
+
+  it('should replace existing fmt parameter with json3', () => {
+    const response = {
+      captions: {
+        playerCaptionsTracklistRenderer: {
+          captionTracks: [
+            {
+              baseUrl: 'https://www.youtube.com/api/timedtext?v=test&fmt=srv3&lang=en',
+              languageCode: 'en',
+              name: { simpleText: 'English' },
+            },
+          ],
+        },
+      },
+    };
+    const tracks = extractCaptionTracks(response);
+    expect(tracks[0].baseUrl).toContain('fmt=json3');
+    expect(tracks[0].baseUrl).not.toContain('fmt=srv3');
+  });
 });

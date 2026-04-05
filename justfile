@@ -59,6 +59,10 @@ install-hooks:
     @chmod +x .git/hooks/pre-commit
     @echo "Pre-commit hook installed."
 
+# Smoke test: load extension and navigate to YouTube
+smoke-test *URL:
+    bun run tools/smoke-test.ts {{URL}}
+
 # Run model comparison harness (Phase 4+)
 model-bench *ARGS:
     @echo "Model bench not yet implemented (Phase 4)"

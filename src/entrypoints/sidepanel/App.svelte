@@ -63,21 +63,42 @@
     }
   }
 
+  // Track the YouTube tab we're connected to
+  let youtubeTabId: number | null = $state(null);
+
+  async function findYouTubeTab(): Promise<number | null> {
+    const tabs = await browser.tabs.query({ url: '*://*.youtube.com/watch*' });
+    return tabs[0]?.id ?? null;
+  }
+
   function sendToContent(message: SidePanelMessage) {
-    browser.runtime.sendMessage(message).catch(() => {
-      // Content script may not be loaded
-    });
+    if (youtubeTabId) {
+      browser.tabs.sendMessage(youtubeTabId, message).catch(() => {
+        // Content script may not be loaded
+      });
+    }
   }
 
   function handleSeek(timeMs: number) {
     sendToContent({ type: 'seek-to', timeMs });
   }
 
-  browser.runtime.onMessage.addListener((message: ContentMessage) => {
+  // Listen for messages from content script (via background)
+  browser.runtime.onMessage.addListener((message: ContentMessage, sender) => {
+    // Track which tab the content script is on
+    if (sender.tab?.id) {
+      youtubeTabId = sender.tab.id;
+    }
     handleMessage(message);
   });
 
-  sendToContent({ type: 'request-state' });
+  // On startup, find the YouTube tab and request its state
+  findYouTubeTab().then((tabId) => {
+    if (tabId) {
+      youtubeTabId = tabId;
+      sendToContent({ type: 'request-state' });
+    }
+  });
 </script>
 
 <main>
