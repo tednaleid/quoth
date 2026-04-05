@@ -46,3 +46,117 @@ describe('IFramePlayer.seekTo', () => {
     expect(sent.args[0]).toBe(1.5);
   });
 });
+
+describe('IFramePlayer.initialize', () => {
+  it('subscribes to messages', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    expect(deps.subscribeToMessages).toHaveBeenCalledOnce();
+    expect(deps.isSubscribed()).toBe(true);
+  });
+
+  it('posts a listening event on initialize', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    const listeningMsg = deps.postMessage.mock.calls
+      .map((c) => JSON.parse(c[0]))
+      .find((m) => m.event === 'listening');
+    expect(listeningMsg).toEqual({
+      event: 'listening',
+      id: 'quoth-player',
+      channel: 'widget',
+    });
+  });
+});
+
+describe('IFramePlayer state updates', () => {
+  it('updates currentTimeMs when infoDelivery contains currentTime', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    deps.fireMessage(
+      JSON.stringify({
+        event: 'infoDelivery',
+        info: { currentTime: 12.34 },
+      }),
+    );
+    expect(player.getState().currentTimeMs).toBe(12340);
+  });
+
+  it('updates isPlaying from playerState=1 (playing)', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    deps.fireMessage(
+      JSON.stringify({
+        event: 'infoDelivery',
+        info: { currentTime: 0, playerState: 1 },
+      }),
+    );
+    expect(player.getState().isPlaying).toBe(true);
+  });
+
+  it('updates isPlaying=false from playerState=2 (paused)', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    deps.fireMessage(
+      JSON.stringify({
+        event: 'infoDelivery',
+        info: { currentTime: 0, playerState: 2 },
+      }),
+    );
+    expect(player.getState().isPlaying).toBe(false);
+  });
+
+  it('updates durationMs when infoDelivery contains duration', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    deps.fireMessage(
+      JSON.stringify({
+        event: 'infoDelivery',
+        info: { currentTime: 0, duration: 120.5 },
+      }),
+    );
+    expect(player.getState().durationMs).toBe(120500);
+  });
+
+  it('accepts object messages directly (not just JSON strings)', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    deps.fireMessage({
+      event: 'infoDelivery',
+      info: { currentTime: 7 },
+    });
+    expect(player.getState().currentTimeMs).toBe(7000);
+  });
+
+  it('ignores non-infoDelivery events', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    deps.fireMessage(JSON.stringify({ event: 'onReady' }));
+    expect(player.getState().currentTimeMs).toBe(0);
+  });
+
+  it('preserves duration when a later infoDelivery omits it', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    deps.fireMessage(JSON.stringify({ event: 'infoDelivery', info: { duration: 99.9 } }));
+    deps.fireMessage(JSON.stringify({ event: 'infoDelivery', info: { currentTime: 1 } }));
+    expect(player.getState().durationMs).toBe(99900);
+  });
+
+  it('handles malformed JSON gracefully', () => {
+    const deps = makeDeps();
+    const player = new IFramePlayer(deps);
+    player.initialize();
+    expect(() => deps.fireMessage('not-json{{{')).not.toThrow();
+    expect(player.getState().currentTimeMs).toBe(0);
+  });
+});
