@@ -1,3 +1,7 @@
+/**
+ * ABOUTME: YouTube content script (isolated world) - wires adapters to extension messaging.
+ * ABOUTME: Instantiates TranscriptSource and VideoPlayer adapters, handles page navigation events.
+ */
 import { YouTubeTranscriptSource } from '../adapters/youtube/transcript-source';
 import { YouTubeVideoPlayer } from '../adapters/youtube/video-player';
 import { extractVideoId } from '../core/youtube';
