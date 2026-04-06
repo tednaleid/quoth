@@ -16,11 +16,6 @@ test *ARGS:
 test-watch *ARGS:
     bunx vitest {{ARGS}}
 
-# Run E2E tests (Chromium-based, requires Chrome build)
-test-e2e:
-    just build chrome
-    bunx playwright test
-
 # Run linter (optionally pass specific files, e.g. just lint src/core/types.ts)
 lint *ARGS:
     {{ if ARGS == "" { "bunx eslint src/ tests/" } else { "bunx eslint " + ARGS } }}
@@ -70,20 +65,15 @@ install-hooks:
     @chmod +x .git/hooks/pre-commit
     @echo "Pre-commit hook installed."
 
-# Smoke test: load Chrome extension and navigate to YouTube (Chromium only -- Playwright cannot load Firefox extensions)
-smoke-test *URL:
-    just build chrome
-    bun run tools/smoke-test.ts {{URL}}
-
-# Firefox tab-mode smoke test: verify side panel renders in Gecko engine
-smoke-test-firefox:
-    just build
-    bun run tools/smoke-test-firefox.ts
-
 # Watch-page smoke test: load watch.html directly and verify transcript + click-to-seek
-smoke-test-watch *VIDEO_ID:
+smoke-test *VIDEO_ID:
     just build chrome
     bun run tools/smoke-test-watch.ts {{VIDEO_ID}}
+
+# Firefox watch-page smoke test: verify transcript + click-to-seek in Gecko engine
+smoke-test-firefox-watch *VIDEO_ID:
+    just build
+    bun run tools/smoke-test-firefox-watch.ts {{VIDEO_ID}}
 
 # Debug Firefox extension: load built extension, navigate to YouTube, log all console output
 debug-firefox *URL:
