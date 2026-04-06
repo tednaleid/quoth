@@ -35,18 +35,20 @@ Revisit if/when we want Chrome dev mode to be seamless.
 
 ---
 
-## WXT type gaps for browser sidebar APIs
+## YouTube embed player has different controls from the watch page
 
-**Environment:** All builds.
+**Environment:** All builds (watch page).
 
-**Symptoms:** `@ts-expect-error` comments appear in:
-- `src/adapters/chrome/sidebar-host.ts` -- `chrome.sidePanel` not in WXT types
-- `src/adapters/firefox/sidebar-host.ts` -- `browser.sidebarAction` not in WXT types
+**Symptoms:** The embedded YouTube player shows a minimal control layout
+(volume button at top right, settings gear, no progress bar scrubber at
+top). This looks different from the regular youtube.com/watch player.
 
-**Root cause:** WXT's type definitions lag behind browser extension APIs.
-Tracked upstream at wxt-dev/wxt#1256 and wxt-dev/wxt#1652.
+**Root cause:** YouTube's embed player (`youtube.com/embed/...`) is a
+different player UI from the watch page player. It renders inside a
+cross-origin iframe, so we cannot style or modify it.
 
-**Workaround:** `@ts-expect-error` comments with explanation. Will be
-removed once WXT publishes updated types.
+**Possible improvements:** YouTube embed URL parameters (`rel=0`,
+`modestbranding=1`, `iv_load_policy=3`) can reduce visual clutter but
+cannot change the fundamental control layout.
 
-**Status:** Cosmetic. Compiles and runs correctly.
+**Status:** Cosmetic. Polish item for a future pass.
