@@ -1,7 +1,7 @@
 # Dedicated Watch Page (Quoth hybrid spike alongside sidebar)
 
 Date: 2026-04-05
-Status: design proposal, not yet implemented
+Status: implemented on feature/watch-page branch
 
 ## Context
 
@@ -47,7 +47,8 @@ Uses YouTube's own `t=` timestamp format. Bookmarkable. Stable URL on Chrome Web
 Hexagonal ports-and-adapters:
 
 - New port: `CacheStore`
-- New adapter: `IFramePlayer` (implements existing `VideoPlayer` port via YouTube IFrame Player API postMessage contract)
+- Embed content script: `src/entrypoints/embed.content.ts` -- content script matching `youtube.com/embed/*` that polls `<video>.currentTime` directly (YouTube's IFrame Player API refuses to send `infoDelivery` postMessage events to `chrome-extension://` parent origins, so the IFramePlayer adapter approach was attempted and replaced)
+- DNR rules: `public/dnr-rules.json` -- declarativeNetRequest rules that strip Origin header and set Referer on YouTube requests from the extension context
 - New adapter: `ChromeStorageLocalCache` (implements `CacheStore` via `browser.storage.local`)
 
 Reused unchanged from `core/`:
@@ -88,10 +89,10 @@ browser.tabs.create({
 - `src/entrypoints/watch/index.html`
 - `src/entrypoints/watch/main.ts`
 - `src/entrypoints/watch/App.svelte`
-- `src/adapters/youtube/IFramePlayer.ts` (new `VideoPlayer` adapter using IFrame Player API)
+- `src/entrypoints/embed.content.ts` (content script for `youtube.com/embed/*` iframes, polls `<video>.currentTime`)
+- `public/dnr-rules.json` (declarativeNetRequest rules for YouTube request headers)
 - `src/ports/CacheStore.ts`
 - `src/adapters/browser/ChromeStorageLocalCache.ts`
-- `tests/unit/adapters/iframe-player.test.ts`
 - `tests/unit/adapters/chrome-storage-local-cache.test.ts`
 - `tools/smoke-test-watch.ts` (Playwright script for watch page)
 - `justfile` recipe: `smoke-test-watch`

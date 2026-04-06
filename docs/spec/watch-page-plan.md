@@ -1,5 +1,13 @@
 # Watch Page Implementation Plan
 
+> **Implementation note (2026-04-05):** Tasks 4-6 (IFramePlayer adapter) were
+> implemented as planned but then replaced in commit 95f0800. YouTube's IFrame
+> Player API refuses to send `infoDelivery` postMessage events to
+> `chrome-extension://` parent origins. The replacement is an embed content
+> script (`src/entrypoints/embed.content.ts`) that injects into
+> `youtube.com/embed/*` iframes and polls `<video>.currentTime` directly. Tasks
+> 4-6 code was deleted; `IFramePlayer` no longer exists.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a standalone extension page at `chrome-extension://<id>/watch.html?v=X&t=N` that embeds a YouTube video via iframe and renders the transcript below, sharing the `core/` logic with the existing sidebar.

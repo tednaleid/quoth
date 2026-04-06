@@ -25,7 +25,7 @@ export default defineConfig({
       'tabs',
       'storage',
       'unlimitedStorage',
-      'declarativeNetRequest',
+      'declarativeNetRequestWithHostAccess',
     ],
     host_permissions: ['*://*.youtube.com/*'],
     declarative_net_request: {
