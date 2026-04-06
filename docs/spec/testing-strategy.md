@@ -8,8 +8,7 @@ Three layers of verification, each catching a different class of bug. Cheap fast
 **Speed:** ~1-2s for the full suite
 **What they cover:**
 - Pure logic in `src/core/` (transcript parsing, word segmentation, active-word binary search, URL parsing)
-- Adapters in `src/adapters/` exercised through dependency-injected mocks (fake fetch, fake storage, fake iframe deps)
-- The `TranscriptState` state machine in `src/core/message-handler.ts`
+- Adapters in `src/adapters/` exercised through dependency-injected mocks (fake fetch, fake storage)
 
 **What they cannot catch:**
 - Browser API binding bugs (like `this`-binding issues with stored function references)
@@ -19,32 +18,29 @@ Three layers of verification, each catching a different class of bug. Cheap fast
 
 **When to run:** constantly during development and always before committing via `just check`.
 
-## Layer 2: Smoke tests (Playwright + real Chromium)
+## Layer 2: Smoke tests (Playwright + real browser)
 
 **Commands:**
-- `just smoke-test` — sidebar path
-- `just smoke-test-watch` — watch-page path
-- `just smoke-test-firefox` — Firefox tab-mode rendering check
+- `just smoke-test` -- Chrome watch page (Chromium + real extension)
+- `just smoke-test-firefox-watch` -- Firefox watch page (Gecko engine)
 
-**Speed:** ~15-30s each. They build the extension, launch Chromium with the extension loaded, hit real YouTube, and assert on actual DOM + network behavior.
+**Speed:** ~15-30s each. They build the extension, launch the browser with the extension loaded, hit real YouTube, and assert on actual DOM + network behavior.
 
 ### `just smoke-test` verifies
 
 1. Extension loads and manifest is valid
-2. Content script injects on youtube.com/watch, fetches captions via Innertube ANDROID API, produces a populated transcript
-3. Sidebar (opened as a regular tab since Playwright cannot open native sidebars) renders words
-4. Clicking a word sends a `seek-to` message → content script → main-world bridge → YouTube player's `seekTo()` → `video.currentTime` actually advances to the target
+2. Watch page loads at `chrome-extension://<id>/watch.html?v=...&t=...`
+3. DNR rules correctly rewrite the `Origin` and `Referer` headers so YouTube's Innertube API and embed player accept requests from the `chrome-extension://` origin
+4. Embed iframe loads and the YouTube video plays
+5. The `youtube.com/embed/*` content script injects into the iframe (`allFrames: true`) and polls the `<video>` element's `currentTime` every 250ms
+6. Time updates flow via `browser.runtime.sendMessage` from content script to watch page, driving active-word highlighting
+7. Clicking a transcript word sends `browser.tabs.sendMessage({frameId})` to the content script, which sets `video.currentTime = X` (verified by the active-word highlight jumping to the clicked timestamp)
+8. Live playback tracking works: after a click + 1.5s wait, the active-word highlight has advanced further than the clicked position
+9. `ChromeStorageLocalCache` works: reloading the page re-renders the transcript in <500ms (implicit cache hit)
 
-### `just smoke-test-watch` verifies
+### `just smoke-test-firefox-watch` verifies
 
-1. Watch page loads at `chrome-extension://<id>/watch.html?v=...&t=...`
-2. DNR rules correctly rewrite the `Origin` and `Referer` headers so YouTube's Innertube API and embed player accept requests from the `chrome-extension://` origin
-3. Embed iframe loads and the YouTube video plays
-4. The `youtube.com/embed/*` content script injects into the iframe (`allFrames: true`) and polls the `<video>` element's `currentTime` every 250ms
-5. Time updates flow via `browser.runtime.sendMessage` from content script → watch page, driving active-word highlighting
-6. Clicking a transcript word → `browser.tabs.sendMessage({frameId})` → content script → `video.currentTime = X` (verified by the active-word highlight jumping to the clicked timestamp)
-7. Live playback tracking works: after a click + 1.5s wait, the active-word highlight has **advanced** further than the clicked position
-8. `ChromeStorageLocalCache` works: reloading the page re-renders the transcript in <500ms (implicit cache hit)
+The same flows as above but through Gecko and the Firefox embed intermediary path (GitHub Pages wrapper). Confirms Firefox-specific header handling and the moz-extension:// origin fix work end-to-end.
 
 **Why smoke tests matter:** they catch integration-layer bugs that unit tests cannot.
 
@@ -59,12 +55,12 @@ Examples of bugs previously caught only by smoke tests:
 ## Layer 3: Interactive / manual verification
 
 **Commands:**
-- `just dev firefox '<url>'` or `just dev chrome '<url>'` — dev mode with persistent profile
-- `just debug-firefox '<url>'` — Firefox with console logging forwarded to stdout
+- `just dev firefox '<url>'` or `just dev chrome '<url>'` -- dev mode with persistent profile
+- `just debug-firefox '<url>'` -- Firefox with console logging forwarded to stdout
 
 **When to use:**
 - Verifying UI/UX feel (visual spacing, animation smoothness, transitions)
-- Cross-browser behaviors that smoke tests don't cover (Firefox sidebar docking, Chrome vs Firefox extension chrome)
+- Cross-browser behaviors that smoke tests don't cover (Firefox embed behavior, Chrome vs Firefox extension chrome)
 - Reproducing user-reported issues with a real profile + cookies
 - Final manual sanity check before shipping
 
@@ -78,7 +74,7 @@ unit (fast) → smoke (slow) → manual (slowest)
 
 **Standard pre-commit flow:** `just check` (runs unit tests + lint + typecheck + fmt). The pre-commit hook runs this automatically.
 
-**Before claiming a browser-integration change works:** also run the relevant smoke test(s). Unit tests passing ≠ feature works in a browser.
+**Before claiming a browser-integration change works:** also run the relevant smoke test(s). Unit tests passing does not mean the feature works in a browser.
 
 **Before handing a feature to a reviewer:** verify end-to-end with Playwright yourself. Don't ask the reviewer to manually exercise something you can automate.
 

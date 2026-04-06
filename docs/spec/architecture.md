@@ -6,124 +6,103 @@ architecture, ports, and adapters), see `docs/spec/design.md`.
 
 ## Extension Component Model
 
-The extension runs across four isolated JavaScript contexts that communicate
-via message passing.
+The extension runs across two isolated JavaScript contexts plus one content
+script injected into embedded iframes.
 
 ```mermaid
 graph TB
-    subgraph "YouTube Page"
-        YT[YouTube Player]
-        MW["youtube-player.content.ts<br/>(MAIN world)<br/>Has access to YouTube's<br/>player API + page cookies"]
-        CS["content.ts<br/>(ISOLATED world)<br/>Fetches captions via Innertube<br/>Observes video playback time"]
-    end
-
     subgraph "Extension Context"
-        BG["background.ts<br/>(Service Worker / Event Page)<br/>SidebarHost initialization<br/>(browser-specific)"]
-        SP["sidepanel/<br/>(Svelte 5 App)<br/>Renders transcript<br/>Handles search + export"]
+        BG["background.ts<br/>(Service Worker / Event Page)<br/>Icon click handler<br/>Firefox Innertube header fix"]
+        WP["watch/<br/>(Svelte 5 App)<br/>Embeds YouTube via iframe<br/>Fetches + displays transcript<br/>Handles click-to-seek"]
     end
 
-    CS -. "browser.runtime.sendMessage<br/>(broadcast to extension contexts)" .-> SP
-    SP -- "browser.tabs.sendMessage(tabId)" --> CS
-    CS -- "window.postMessage" --> MW
-    MW -- "player.seekTo()" --> YT
-    CS -- "setInterval 250ms<br/>video.currentTime" --> YT
+    subgraph "YouTube Embed iframe"
+        EC["embed.content.ts<br/>(ISOLATED world)<br/>Polls video.currentTime<br/>Handles seek commands"]
+        VID[YouTube Video Element]
+    end
+
+    BG -- "tabs.update(url=watch.html?v=...&t=...)" --> WP
+    EC -- "runtime.sendMessage(EmbedMessage)" --> WP
+    WP -- "tabs.sendMessage(frameId, WatchPageMessage)" --> EC
+    EC -- "video.currentTime = X" --> VID
+    EC -- "read video.currentTime" --> VID
 ```
 
-**Why two content scripts?** Chrome MV3 content scripts run in an "isolated
-world" -- they can access the page DOM but not the page's JavaScript globals.
-YouTube's player API (`player.seekTo()`, `player.playVideo()`) is only
-available in the page's main world. So we have:
+**Why a content script in the embed iframe?** The watch page's iframe loads
+`youtube.com/embed/*`. The extension injects `embed.content.ts` into that
+origin (via `allFrames: true`). The content script has direct DOM access to the
+`<video>` element inside the iframe, so it can poll `video.currentTime` without
+any YouTube API restrictions. Seek commands set `video.currentTime` directly --
+no main-world bridge or YouTube player API is needed because we control the
+embed iframe.
 
-- `content.ts` (isolated world): handles extension messaging, fetches captions
-  via the Innertube API, reads `video.currentTime` for playback sync
-- `youtube-player.content.ts` (main world): receives seek commands via
-  `window.postMessage` and calls YouTube's player API
-
-**Why the background script is minimal:** Its only job is browser-specific
-sidebar initialization (Chrome uses `chrome.sidePanel.setPanelBehavior()`,
-Firefox uses `browser.browserAction.onClicked`). Messages flow directly between
-content script and side panel without routing through the background.
+**Why the background script is minimal:** Its only job is handling icon clicks
+(navigating the current YouTube tab to `watch.html`) and applying a Firefox
+header fix for Innertube requests. No messages are routed through it.
 
 ---
 
 ## Messaging Model
 
-Messages flow directly between content script and side panel using two API
-patterns. The background script does NOT route messages.
+Two message types flow between `embed.content.ts` and the watch page.
 
-| Direction | API | Notes |
-|---|---|---|
-| Content -> Side panel | `browser.runtime.sendMessage(msg)` | Broadcasts to all extension contexts. Side panel's `onMessage` listener filters by `sender.tab.id`. |
-| Side panel -> Content | `browser.tabs.sendMessage(tabId, msg)` | Targets a specific tab's content script directly. |
+| Type | Direction | API | Purpose |
+|---|---|---|---|
+| `EmbedMessage` (`embed-time-update`) | embed.content.ts -> watch page | `browser.runtime.sendMessage` | Reports current video time, playing state, duration every 250ms |
+| `WatchPageMessage` (`embed-seek`) | watch page -> embed.content.ts | `browser.tabs.sendMessage(tabId, msg, { frameId })` | Commands the embed to seek to a timestamp |
 
-**Message loss when side panel is closed:** `runtime.sendMessage` silently
-succeeds (or rejects with "Receiving end does not exist") when no listener is
-registered. Side panel catches the rejection. When the side panel opens, it
-sends a `request-state` message to the content script, which resets its cache
-and re-sends the current state.
+The watch page learns the embed's `tabId` and `frameId` from the first
+`embed-time-update` it receives (via `sender.tab.id` and `sender.frameId`).
 
 ---
 
-## Flow 1: Loading the Transcript
+## Flow 1: Opening the Watch Page
 
-When the user opens a YouTube video and the extension is active.
+When the user clicks the extension icon on a YouTube watch page.
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant YT as YouTube Page
-    participant CS as Content Script<br/>(isolated world)
-    participant Innertube as YouTube<br/>Innertube API
-    participant SP as Side Panel
+    participant YT as YouTube Tab
+    participant BG as background.ts
+    participant WP as watch page
 
-    User->>YT: Navigate to youtube.com/watch?v=abc
-    Note over CS: Content script auto-loads<br/>(matches youtube.com/watch*)
-
-    CS->>CS: Extract video ID from URL
-    CS->>Innertube: POST /youtubei/v1/player<br/>(ANDROID client context)
-    Innertube-->>CS: Player response<br/>(video info + caption track URLs)
-
-    Note over CS: Single getVideoMetadata() call<br/>returns videoInfo + captionTracks
-
-    CS-->>SP: {type: 'video-detected', videoInfo, captionTracks}<br/>(runtime.sendMessage broadcast)
-
-    Note over CS: Find English caption track<br/>Replace fmt=srv3 with fmt=json3
-    CS->>Innertube: GET caption baseUrl<br/>(&fmt=json3)
-    Innertube-->>CS: JSON3 caption data<br/>(events[] with word-level timing)
-
-    CS->>CS: parseJson3Captions(json3)<br/>produces TimedWord[]
-    CS-->>SP: {type: 'captions-loaded', words[]}<br/>(runtime.sendMessage broadcast)
-
-    SP->>SP: handleMessage(state, msg)<br/>groupWordsIntoSegments(words)<br/>Render word spans
-    Note over SP: Transcript visible immediately
+    User->>BG: Click extension icon
+    BG->>YT: executeScript: video.currentTime
+    YT-->>BG: currentTime (seconds)
+    BG->>BG: extractVideoId(tab.url)
+    BG->>YT: tabs.update(url=watch.html?v=VIDEO_ID&t=SECONDS)
+    Note over WP: watch.html loads in same tab
+    WP->>WP: parseWatchParams(location.search)
+    WP->>WP: loadTranscript(videoId)
+    Note over WP: Check ChromeStorageLocalCache first
+    WP->>WP: Render iframe + transcript
 ```
 
-**Key detail:** The content script uses YouTube's Innertube API with an ANDROID
-client context (`clientName: 'ANDROID'`). This returns caption URLs that work
-without browser cookies, unlike the URLs embedded in the web page's
-`ytInitialPlayerResponse` which require session cookies for the timedtext fetch.
+The extension icon is disabled by default and enabled per-tab only when the
+current tab URL matches a YouTube `/watch` page (via `tabs.onUpdated`).
 
 ---
 
 ## Flow 2: Playback Sync (Video Playing)
 
-While the video plays, the transcript highlights the current sentence and
+While the video plays, the transcript highlights the current word and
 auto-scrolls.
 
 ```mermaid
 sequenceDiagram
-    participant YT as YouTube Player
-    participant CS as Content Script
-    participant SP as Side Panel
+    participant VID as Video Element
+    participant EC as embed.content.ts
+    participant WP as watch page
 
-    Note over CS: setInterval every 250ms<br/>(YouTubeVideoPlayer.onTimeUpdate)
+    Note over EC: setInterval every 250ms
 
     loop Every 250ms
-        CS->>YT: Read video.currentTime
-        CS-->>SP: {type: 'time-update', currentTimeMs, isPlaying}<br/>(runtime.sendMessage broadcast)
-        SP->>SP: findActiveWordIndex(words, currentTimeMs)<br/>Binary search in sorted timestamps
-        SP->>SP: findActiveSegmentIndex(segments, currentTimeMs)
-        SP->>SP: Highlight active sentence<br/>Auto-scroll if enabled
+        EC->>VID: Read video.currentTime
+        EC->>WP: runtime.sendMessage({type: 'embed-time-update',<br/>currentTimeMs, isPlaying, durationMs})
+        WP->>WP: findActiveWordIndex(words, currentTimeMs)<br/>Binary search in sorted timestamps
+        WP->>WP: findActiveSegmentIndex(segments, currentTimeMs)
+        WP->>WP: Highlight active word<br/>Auto-scroll if enabled
     end
 ```
 
@@ -141,47 +120,41 @@ When the user clicks a word in the transcript to jump the video to that time.
 ```mermaid
 sequenceDiagram
     participant User
-    participant SP as Side Panel
-    participant CS as Content Script<br/>(isolated world)
-    participant MW as Main World Script
-    participant YT as YouTube Player
+    participant WP as watch page
+    participant EC as embed.content.ts
+    participant VID as Video Element
 
-    User->>SP: Click word span<br/>(data-start="5600")
-    SP->>CS: browser.tabs.sendMessage(tabId,<br/>{type: 'seek-to', timeMs: 5600})
-    CS->>MW: window.postMessage<br/>{type: 'quoth-seek', timeSeconds: 5.6}
-    MW->>YT: player.seekTo(5.6, true)
-    Note over YT: allowSeekAhead=true<br/>Handles buffering internally
-    YT->>YT: Seeks to 5.6s
-
-    Note over CS: Next 250ms tick picks up new time
-    CS-->>SP: {type: 'time-update', currentTimeMs: 5600}
-    SP->>SP: Update highlight + scroll position
+    User->>WP: Click word span (data-start="5600")
+    WP->>EC: tabs.sendMessage(tabId,<br/>{type: 'embed-seek', timeMs: 5600},<br/>{frameId})
+    EC->>VID: video.currentTime = 5.6
+    Note over EC: Next 250ms tick picks up new time
+    EC->>WP: embed-time-update {currentTimeMs: 5600}
+    WP->>WP: Update highlight + scroll position
 ```
 
-**Why `player.seekTo()` instead of `video.currentTime`?** YouTube's player API
-handles buffering, ad state, and seek-ahead internally. Setting
-`video.currentTime` directly can cause the player to crash when seeking to
-unbuffered regions.
+Setting `video.currentTime` directly works here because the embed iframe is
+fully under the extension's control -- we injected the content script, and
+there are no buffering surprises from YouTube's player API.
 
 ---
 
 ## Flow 4: YouTube Controls Seek (User Drags Progress Bar)
 
-When the user seeks using YouTube's own progress bar or keyboard shortcuts.
+When the user seeks using the YouTube player's own controls inside the embed.
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant YT as YouTube Player
-    participant CS as Content Script
-    participant SP as Side Panel
+    participant VID as Video Element
+    participant EC as embed.content.ts
+    participant WP as watch page
 
-    User->>YT: Drag progress bar to 10:00
+    User->>VID: Drag progress bar to 10:00
 
-    Note over CS: Next 250ms tick detects<br/>time jumped from 1:00 to 10:00
-    CS-->>SP: {type: 'time-update', currentTimeMs: 600000}
-    SP->>SP: findActiveWordIndex(words, 600000)
-    SP->>SP: Jump highlight to word at 10:00<br/>Auto-scroll to that position
+    Note over EC: Next 250ms tick detects<br/>time jumped from 1:00 to 10:00
+    EC->>WP: embed-time-update {currentTimeMs: 600000}
+    WP->>WP: findActiveWordIndex(words, 600000)
+    WP->>WP: Jump highlight to word at 10:00<br/>Auto-scroll to that position
 ```
 
 No special handling needed -- the same 250ms polling loop that drives playback
@@ -224,86 +197,24 @@ and provide the paragraph-level timestamps shown in the transcript.
 
 ---
 
-## Cross-Browser Sidebar Differences
+## Cross-Browser Differences
 
-Quoth supports both Chrome and Firefox. Their sidebar APIs are completely
-different, so a `SidebarHost` port (see `docs/spec/design.md`) wraps the
-browser-specific initialization.
+Quoth supports both Chrome and Firefox. The differences are limited to the
+embed URL strategy and the icon click API.
 
 | Aspect | Chrome | Firefox |
 |---|---|---|
-| Manifest key | `side_panel` | `sidebar_action` |
-| Permission needed | `sidePanel` | None |
-| Runtime API | `chrome.sidePanel` | `browser.sidebarAction` |
-| Default position | Right | Left |
-| Persistence | Configurable (global or per-tab) | Always per-window, persistent |
-| Open on icon click | `setPanelBehavior({openPanelOnActionClick: true})` | `browserAction.onClicked -> sidebarAction.toggle()` |
-| Manifest version | MV3 only | MV2 or MV3 (we build MV2 for Firefox) |
+| Manifest version | MV3 | MV2 |
+| Icon click API | `chrome.action.onClicked` | `browser.browserAction.onClicked` |
+| Embed URL | Direct `youtube.com/embed/*` | GitHub Pages intermediary (`tednaleid.github.io/quoth/yt-embed.html`) |
+| Innertube Origin fix | DNR rule strips `chrome-extension://` Origin | `webRequest.onBeforeSendHeaders` rewrites Origin to `https://www.youtube.com` |
 
-**WXT handles manifest conversion automatically.** We declare `side_panel` in
-`wxt.config.ts`; WXT converts it to `sidebar_action` for Firefox builds, strips
-the `sidePanel` permission from Firefox, etc. Our code only needs to handle
-the runtime API differences via `SidebarHost` adapters.
+**Why Firefox needs an embed intermediary:** YouTube's embed player requires a
+real HTTPS parent origin for cookie handling and bot verification. A
+`moz-extension://` parent origin triggers bot checks. A static page on GitHub
+Pages serves as an intermediary that wraps the embed with a real HTTPS origin,
+which satisfies YouTube's requirements.
 
----
-
-## Sidebar Mode vs Tab Mode
-
-The side panel page (`sidepanel.html`) is a standalone Svelte app that works
-in two modes. The same HTML/JS runs in both -- it discovers the YouTube tab
-via `browser.tabs.query` and communicates via extension messaging regardless
-of how it's rendered.
-
-```mermaid
-graph TB
-    subgraph "Sidebar Mode (default)"
-        direction LR
-        YT1["YouTube Tab<br/>(active tab)"]
-        SP1["Browser Sidebar<br/>Docked alongside tab<br/>~350px wide"]
-        YT1 --- SP1
-    end
-
-    subgraph "Tab Mode (pop-out)"
-        direction LR
-        YT2["YouTube Tab<br/>(Tab 1)"]
-        SP2["Transcript Tab<br/>(Tab 2, full width)<br/>chrome-extension://&lt;id&gt;/sidepanel.html<br/>or moz-extension://&lt;uuid&gt;/sidepanel.html"]
-    end
-
-    SP1 -. "Same code,<br/>same messaging" .-> SP2
-```
-
-### How tab mode works
-
-The side panel app finds the YouTube tab via the `TabConnector` port, which
-queries for matching URLs:
-
-```typescript
-const [ytTab] = await browser.tabs.query({ active: true });
-// Falls back to any YouTube tab if active tab isn't YouTube
-```
-
-This works identically whether the app runs as a browser sidebar or as a
-standalone tab. The content script on the YouTube page doesn't know or care
-which mode the side panel is in -- it receives the same messages and responds
-the same way.
-
-### What tab mode gives you
-
-| Feature | Sidebar | Tab |
-|---------|---------|-----|
-| Video + transcript visible at once | Yes (side by side) | No (tab switch) |
-| Transcript width | ~350px fixed | Full tab width |
-| Native Ctrl+F search | No (panel) | Yes (browser search) |
-| Text selection + copy | Awkward in narrow panel | Full browser support |
-| Separate window | No | Yes (drag tab out) |
-| Bookmarkable | No | Yes |
-| Playwright testable | No (no API to open browser sidebar) | Yes (full DOM access) |
-
-### Automated testing uses tab mode
-
-Playwright cannot programmatically open the browser's native sidebar (no API
-exists for either Chrome's sidePanel or Firefox's sidebarAction). The smoke
-tests (`just smoke-test`, `just smoke-test-firefox`) open `sidepanel.html` as
-a regular tab, which gives Playwright full DOM access for clicking words,
-reading transcript content, and verifying seek behavior. This is functionally
-identical to sidebar mode because the same code and messaging paths are used.
+**WXT handles manifest conversion automatically.** We declare a single
+`wxt.config.ts`; WXT generates the correct manifest for each browser, including
+MV2 vs MV3 differences and permission handling.
