@@ -8,33 +8,72 @@ import { createSidebarHost } from '../adapters/sidebar-host-factory';
 export default defineBackground(() => {
   console.log(`[quoth] background started, extension URL: ${browser.runtime.getURL('')}`);
 
-  // Register webRequest handler FIRST (before sidebar init which may fail).
-  // Firefox MV2: webRequest API for header modifications (Chrome uses declarativeNetRequest rules).
-  // Firefox MV2 does not support declarativeNetRequest, so we use the older webRequest API
-  // to apply the same header modifications: strip Origin on Innertube, set Referer for embeds.
+  // Register webRequest handlers FIRST (before sidebar init which may fail).
+  // Firefox MV2 does not support declarativeNetRequest (Chrome uses DNR rules).
+  // We use the older webRequest API to rewrite Origin + Referer headers for
+  // requests originating from our extension's watch page (moz-extension://).
   if (import.meta.env.BROWSER === 'firefox') {
-    const extensionOrigin = browser.runtime.getURL('');
-    console.log('[quoth] registering Firefox webRequest header handler');
+    console.log('[quoth] registering Firefox webRequest header handlers');
+
+    // Detect whether a request originates from our extension page or an
+    // iframe embedded within it. For the initial sub_frame load, originUrl
+    // is moz-extension://. For requests INSIDE the YouTube iframe,
+    // originUrl is youtube.com — but frameAncestors includes our extension.
+    type DetailsWithFirefoxFields = {
+      originUrl?: string;
+      documentUrl?: string;
+      frameAncestors?: Array<{ url: string; frameId: number }>;
+    };
+
+    function isFromExtension(details: DetailsWithFirefoxFields): boolean {
+      const ext = details as DetailsWithFirefoxFields;
+      if (ext.originUrl?.startsWith('moz-extension://')) return true;
+      if (ext.documentUrl?.startsWith('moz-extension://')) return true;
+      if (ext.frameAncestors?.some((a) => a.url.startsWith('moz-extension://'))) return true;
+      return false;
+    }
+
+    // Rewrite request headers: replace Origin, add Referer
     browser.webRequest.onBeforeSendHeaders.addListener(
       (details) => {
         if (!details.requestHeaders) return { requestHeaders: details.requestHeaders };
-        // Only modify requests originating from our extension (moz-extension://...).
-        // Leave normal YouTube browsing untouched. When originUrl is absent
-        // (e.g. top-level navigations), do NOT modify — safe default is pass-through.
-        const originUrl = (details as { originUrl?: string }).originUrl;
-        if (!originUrl || !originUrl.startsWith(extensionOrigin)) {
+        if (!isFromExtension(details as DetailsWithFirefoxFields)) {
           return { requestHeaders: details.requestHeaders };
         }
-        console.log(`[quoth] modifying headers for: ${details.url.slice(0, 80)}`);
-        const headers = details.requestHeaders.filter((h) => h.name.toLowerCase() !== 'origin');
-        const hasReferer = headers.some((h) => h.name.toLowerCase() === 'referer');
-        if (!hasReferer) {
-          headers.push({ name: 'Referer', value: 'https://quoth.local/' });
+        for (const header of details.requestHeaders) {
+          const name = header.name.toLowerCase();
+          if (name === 'origin') header.value = 'https://www.youtube.com';
+          if (name === 'referer') header.value = 'https://www.youtube.com/';
         }
-        return { requestHeaders: headers };
+        const hasReferer = details.requestHeaders.some((h) => h.name.toLowerCase() === 'referer');
+        if (!hasReferer) {
+          details.requestHeaders.push({
+            name: 'Referer',
+            value: 'https://www.youtube.com/',
+          });
+        }
+        return { requestHeaders: details.requestHeaders };
+      },
+      {
+        urls: ['*://*.youtube.com/*', '*://*.googlevideo.com/*', '*://*.youtube-nocookie.com/*'],
+      },
+      ['blocking', 'requestHeaders'],
+    );
+
+    // Strip X-Frame-Options response headers that block iframe embedding
+    browser.webRequest.onHeadersReceived.addListener(
+      (details) => {
+        if (!isFromExtension(details as DetailsWithFirefoxFields)) {
+          return { responseHeaders: details.responseHeaders };
+        }
+        return {
+          responseHeaders: details.responseHeaders?.filter(
+            (h) => h.name.toLowerCase() !== 'x-frame-options',
+          ),
+        };
       },
       { urls: ['*://*.youtube.com/*'] },
-      ['blocking', 'requestHeaders'],
+      ['blocking', 'responseHeaders'],
     );
   }
 
