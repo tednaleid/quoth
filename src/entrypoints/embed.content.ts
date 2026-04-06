@@ -7,22 +7,7 @@ import type { EmbedMessage, WatchPageMessage } from '../messages';
 export default defineContentScript({
   matches: ['*://*.youtube.com/embed/*'],
   allFrames: true,
-  runAt: 'document_start',
   main() {
-    // Firefox sets document.referrer to "" for navigations from moz-extension:// pages
-    // because moz-extension:// is not an allowed referrer scheme. YouTube's embed player
-    // checks document.referrer via JavaScript and rejects embeds with Error 153 when it's
-    // empty. Fix: inject a main-world script that overrides document.referrer BEFORE
-    // YouTube's player JS reads it. Only override when empty (normal embeds have one).
-    const isFirefox = browser.runtime.getURL('').startsWith('moz-extension://');
-    if (isFirefox && document.referrer === '') {
-      const s = document.createElement('script');
-      s.textContent =
-        "Object.defineProperty(document,'referrer',{get:()=>'https://www.youtube.com/',configurable:true})";
-      (document.documentElement || document).appendChild(s);
-      s.remove();
-    }
-
     function findVideo(): HTMLVideoElement | null {
       return document.querySelector('video');
     }

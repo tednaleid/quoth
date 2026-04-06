@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quoth Video</title>
+<style>*{margin:0;padding:0;overflow:hidden}iframe{width:100vw;height:100vh;border:0}</style>
+</head>
+<body>
+<script>
+var p = new URLSearchParams(location.search);
+var v = p.get('v');
+if (v) {
+  var f = document.createElement('iframe');
+  f.src = 'https://www.youtube.com/embed/' + v + '?enablejsapi=1&start=' + (p.get('t') || '0');
+  f.allow = 'accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture;web-share';
+  f.allowFullscreen = true;
+  document.body.appendChild(f);
+}
+</script>
+</body>
+</html>

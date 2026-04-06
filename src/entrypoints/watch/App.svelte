@@ -27,8 +27,17 @@
   const activeWordIndex = $derived(findActiveWordIndex(words, currentTimeMs));
   const activeSegmentIndex = $derived(findActiveSegmentIndex(segments, currentTimeMs));
 
+  // Firefox: YouTube embeds require a real HTTPS parent origin for cookies and bot
+  // verification. A static intermediary page on GitHub Pages wraps the embed.
+  // Chrome: direct embed works via declarativeNetRequest rules.
+  // Override with VITE_EMBED_URL env var for local testing before GitHub Pages deployment
+  const EMBED_INTERMEDIARY =
+    import.meta.env.VITE_EMBED_URL || 'https://tednaleid.github.io/quoth/yt-embed.html';
+  const isFirefox = browser.runtime.getURL('').startsWith('moz-extension://');
   const embedUrl = params.videoId
-    ? `https://www.youtube.com/embed/${params.videoId}?enablejsapi=1&mute=1&origin=${encodeURIComponent(window.location.origin)}&start=${Math.floor(params.initialTimeMs / 1000)}`
+    ? isFirefox
+      ? `${EMBED_INTERMEDIARY}?v=${params.videoId}&t=${Math.floor(params.initialTimeMs / 1000)}`
+      : `https://www.youtube.com/embed/${params.videoId}?enablejsapi=1&start=${Math.floor(params.initialTimeMs / 1000)}`
     : '';
 
   async function loadTranscript(videoId: string) {

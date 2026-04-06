@@ -29,10 +29,7 @@ export default defineConfig({
         ? ['webRequest', 'webRequestBlocking']
         : ['declarativeNetRequestWithHostAccess']),
     ],
-    host_permissions: [
-      '*://*.youtube.com/*',
-      ...(browser === 'firefox' ? ['*://*.googlevideo.com/*'] : []),
-    ],
+    host_permissions: ['*://*.youtube.com/*'],
     ...(browser !== 'firefox' && {
       declarative_net_request: {
         rule_resources: [

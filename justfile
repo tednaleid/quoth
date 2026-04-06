@@ -46,6 +46,15 @@ build BROWSER="firefox":
 dev BROWSER="firefox" URL="":
     QUOTH_START_URL={{URL}} bunx wxt --browser {{BROWSER}}
 
+# Dev mode with local intermediary server (for testing watch page embed before GitHub Pages deployment)
+dev-embed BROWSER="firefox" URL="":
+    #!/usr/bin/env bash
+    bun -e "Bun.serve({port:8765,fetch(){return new Response(Bun.file('pages/yt-embed.html'),{headers:{'content-type':'text/html'}})}})" &
+    EMBED_PID=$!
+    echo "Intermediary server on http://localhost:8765"
+    VITE_EMBED_URL=http://localhost:8765/yt-embed.html QUOTH_START_URL={{URL}} bunx wxt --browser {{BROWSER}}
+    kill $EMBED_PID 2>/dev/null
+
 # Clean build artifacts and caches (also clears dev browser profiles)
 clean:
     rm -rf .output .wxt node_modules/.vite

@@ -8,80 +8,27 @@ import { createSidebarHost } from '../adapters/sidebar-host-factory';
 export default defineBackground(() => {
   console.log(`[quoth] background started, extension URL: ${browser.runtime.getURL('')}`);
 
-  // Register webRequest handlers FIRST (before sidebar init which may fail).
-  // Firefox MV2 does not support declarativeNetRequest (Chrome uses DNR rules).
-  // We use the older webRequest API to rewrite Origin + Referer headers for
-  // requests originating from our extension's watch page (moz-extension://).
+  // Firefox MV2: strip the moz-extension:// Origin header on Innertube API requests.
+  // YouTube returns 403 when Origin is moz-extension://. The YouTube embed itself
+  // goes through a GitHub Pages intermediary (real HTTPS origin), but the watch page's
+  // direct Innertube fetch for captions still needs this fix.
   if (import.meta.env.BROWSER === 'firefox') {
-    console.log('[quoth] registering Firefox webRequest header handlers');
-
-    // Detect whether a request originates from our extension page or an
-    // iframe embedded within it. For the initial sub_frame load, originUrl
-    // is moz-extension://. For requests INSIDE the YouTube iframe,
-    // originUrl is youtube.com — but frameAncestors includes our extension.
-    type DetailsWithFirefoxFields = {
-      originUrl?: string;
-      documentUrl?: string;
-      frameAncestors?: Array<{ url: string; frameId: number }>;
-    };
-
-    function isFromExtension(details: DetailsWithFirefoxFields): boolean {
-      const ext = details as DetailsWithFirefoxFields;
-      if (ext.originUrl?.startsWith('moz-extension://')) return true;
-      if (ext.documentUrl?.startsWith('moz-extension://')) return true;
-      if (ext.frameAncestors?.some((a) => a.url.startsWith('moz-extension://'))) return true;
-      return false;
-    }
-
-    // Rewrite request headers: replace Origin, add Referer
     browser.webRequest.onBeforeSendHeaders.addListener(
       (details) => {
         if (!details.requestHeaders) return { requestHeaders: details.requestHeaders };
-        // For sub_frame loads of youtube.com/embed/*, always ensure Referer is set.
-        // Firefox doesn't populate frameAncestors or originUrl reliably for the
-        // initial embed load from moz-extension:// pages, so we can't detect the
-        // parent. But embed sub_frames that already have a Referer (normal websites)
-        // won't be affected since we only ADD a missing Referer, not replace it.
-        const isEmbedLoad =
-          details.type === 'sub_frame' && details.url.includes('youtube.com/embed/');
-        const fromExt = isEmbedLoad || isFromExtension(details as DetailsWithFirefoxFields);
-        if (!fromExt) {
+        const originUrl = (details as { originUrl?: string }).originUrl;
+        if (!originUrl || !originUrl.startsWith('moz-extension://')) {
           return { requestHeaders: details.requestHeaders };
         }
         for (const header of details.requestHeaders) {
-          const name = header.name.toLowerCase();
-          if (name === 'origin') header.value = 'https://www.youtube.com';
-          if (name === 'referer') header.value = 'https://www.youtube.com/';
-        }
-        const hasReferer = details.requestHeaders.some((h) => h.name.toLowerCase() === 'referer');
-        if (!hasReferer) {
-          details.requestHeaders.push({
-            name: 'Referer',
-            value: 'https://www.youtube.com/',
-          });
+          if (header.name.toLowerCase() === 'origin') {
+            header.value = 'https://www.youtube.com';
+          }
         }
         return { requestHeaders: details.requestHeaders };
       },
-      {
-        urls: ['*://*.youtube.com/*', '*://*.googlevideo.com/*', '*://*.youtube-nocookie.com/*'],
-      },
+      { urls: ['*://*.youtube.com/youtubei/*'] },
       ['blocking', 'requestHeaders'],
-    );
-
-    // Strip X-Frame-Options response headers that block iframe embedding
-    browser.webRequest.onHeadersReceived.addListener(
-      (details) => {
-        if (!isFromExtension(details as DetailsWithFirefoxFields)) {
-          return { responseHeaders: details.responseHeaders };
-        }
-        return {
-          responseHeaders: details.responseHeaders?.filter(
-            (h) => h.name.toLowerCase() !== 'x-frame-options',
-          ),
-        };
-      },
-      { urls: ['*://*.youtube.com/*'] },
-      ['blocking', 'responseHeaders'],
     );
   }
 
