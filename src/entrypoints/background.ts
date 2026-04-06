@@ -1,10 +1,9 @@
-import { createSidebarHost } from '../adapters/sidebar-host-factory';
+/**
+ * ABOUTME: Background script -- handles extension icon clicks and Firefox header fixes.
+ * ABOUTME: Icon click extracts videoId from YouTube URL, grabs playback time, navigates to watch page.
+ */
+import { extractVideoId } from '../core/youtube';
 
-// The background script's only job is browser-specific sidebar initialization
-// and Firefox header modification for the watch page.
-// Message routing between content script and side panel happens directly:
-//   content -> sidebar:  browser.runtime.sendMessage() broadcasts to all extension contexts
-//   sidebar -> content:  browser.tabs.sendMessage(tabId) targets the content script directly
 export default defineBackground(() => {
   console.log(`[quoth] background started, extension URL: ${browser.runtime.getURL('')}`);
 
@@ -32,6 +31,64 @@ export default defineBackground(() => {
     );
   }
 
-  const sidebarHost = createSidebarHost(import.meta.env.BROWSER);
-  sidebarHost.initialize();
+  // Disable the icon by default; enable it only on YouTube /watch pages.
+  if (import.meta.env.BROWSER === 'firefox') {
+    browser.browserAction?.disable();
+  } else {
+    browser.action.disable();
+  }
+
+  browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (!changeInfo.url && changeInfo.status !== 'complete') return;
+    const videoId = tab.url ? extractVideoId(tab.url) : null;
+    if (import.meta.env.BROWSER === 'firefox') {
+      if (videoId) {
+        browser.browserAction?.enable(tabId);
+      } else {
+        browser.browserAction?.disable(tabId);
+      }
+    } else {
+      if (videoId) {
+        browser.action.enable(tabId);
+      } else {
+        browser.action.disable(tabId);
+      }
+    }
+  });
+
+  // Icon click: navigate the current tab to the watch page with videoId and currentTime.
+  const handleIconClick = async (tab: { id?: number; url?: string }) => {
+    if (!tab.id || !tab.url) return;
+    const videoId = extractVideoId(tab.url);
+    if (!videoId) return;
+
+    let currentTime = 0;
+    try {
+      if (import.meta.env.BROWSER === 'firefox') {
+        const results = await browser.tabs.executeScript(tab.id, {
+          code: "document.querySelector('video')?.currentTime ?? 0",
+        });
+        currentTime = typeof results?.[0] === 'number' ? results[0] : 0;
+      } else {
+        const results = await browser.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () =>
+            (document.querySelector('video') as HTMLVideoElement | null)?.currentTime ?? 0,
+        });
+        currentTime = typeof results?.[0]?.result === 'number' ? results[0].result : 0;
+      }
+    } catch {
+      // If script injection fails (e.g., restricted page), navigate without a timestamp.
+    }
+
+    const seconds = Math.floor(currentTime);
+    const watchUrl = browser.runtime.getURL(`/watch.html?v=${videoId}&t=${seconds}`);
+    await browser.tabs.update(tab.id, { url: watchUrl });
+  };
+
+  if (import.meta.env.BROWSER === 'firefox') {
+    browser.browserAction?.onClicked.addListener(handleIconClick);
+  } else {
+    browser.action.onClicked.addListener(handleIconClick);
+  }
 });
