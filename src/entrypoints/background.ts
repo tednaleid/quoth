@@ -37,7 +37,15 @@ export default defineBackground(() => {
     browser.webRequest.onBeforeSendHeaders.addListener(
       (details) => {
         if (!details.requestHeaders) return { requestHeaders: details.requestHeaders };
-        if (!isFromExtension(details as DetailsWithFirefoxFields)) {
+        // For sub_frame loads of youtube.com/embed/*, always ensure Referer is set.
+        // Firefox doesn't populate frameAncestors or originUrl reliably for the
+        // initial embed load from moz-extension:// pages, so we can't detect the
+        // parent. But embed sub_frames that already have a Referer (normal websites)
+        // won't be affected since we only ADD a missing Referer, not replace it.
+        const isEmbedLoad =
+          details.type === 'sub_frame' && details.url.includes('youtube.com/embed/');
+        const fromExt = isEmbedLoad || isFromExtension(details as DetailsWithFirefoxFields);
+        if (!fromExt) {
           return { requestHeaders: details.requestHeaders };
         }
         for (const header of details.requestHeaders) {
