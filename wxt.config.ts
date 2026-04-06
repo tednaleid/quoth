@@ -17,7 +17,7 @@ export default defineConfig({
     chromiumProfile: chromiumProfilePath,
     keepProfileChanges: true,
   },
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'Quoth',
     description: 'YouTube transcript viewer with client-side formatting',
     permissions: [
@@ -25,18 +25,22 @@ export default defineConfig({
       'tabs',
       'storage',
       'unlimitedStorage',
-      'declarativeNetRequestWithHostAccess',
+      ...(browser === 'firefox'
+        ? ['webRequest', 'webRequestBlocking']
+        : ['declarativeNetRequestWithHostAccess']),
     ],
     host_permissions: ['*://*.youtube.com/*'],
-    declarative_net_request: {
-      rule_resources: [
-        {
-          id: 'innertube_rules',
-          enabled: true,
-          path: 'dnr-rules.json',
-        },
-      ],
-    },
+    ...(browser !== 'firefox' && {
+      declarative_net_request: {
+        rule_resources: [
+          {
+            id: 'innertube_rules',
+            enabled: true,
+            path: 'dnr-rules.json',
+          },
+        ],
+      },
+    }),
     side_panel: {
       default_path: 'sidepanel/index.html',
     },
@@ -46,5 +50,5 @@ export default defineConfig({
         strict_min_version: '109.0',
       },
     },
-  },
+  }),
 });
