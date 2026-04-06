@@ -17,36 +17,43 @@ const firefoxWithExt = withExtension(firefox, extensionPath);
 const browser = await firefoxWithExt.launch({ headless: false });
 const context = await browser.newContext();
 
-// Discover the extension UUID by opening a YouTube page. The content script
-// tags the page DOM with data-quoth-ext-url, which we read from Playwright.
-console.log('Opening YouTube to discover extension UUID...');
-const ytPage = await context.newPage();
-ytPage.on('console', (msg) => {
-  if (msg.text().includes('[quoth')) console.log(`[YT] ${msg.text()}`);
-});
-ytPage.on('pageerror', (e) => console.log(`[ERROR] ${e.message}`));
+// Discover the extension UUID. The deleted content script used to tag the page
+// with data-quoth-ext-url. Now we find it via about:addons or context pages.
+console.log('Discovering extension UUID...');
+let extensionBaseUrl: string | null = null;
 
-await ytPage.goto('https://www.youtube.com/watch?v=' + videoId, {
-  waitUntil: 'load',
-  timeout: 30000,
-});
-await ytPage.waitForTimeout(5000);
+// Give the background script time to start
+const discoveryPage = await context.newPage();
+await discoveryPage.waitForTimeout(2000);
 
-const extensionBaseUrl = await ytPage.evaluate(
-  () => document.documentElement.dataset.quothExtUrl ?? null,
-);
-
-if (!extensionBaseUrl) {
-  console.log('SMOKE TEST FAILED: content script did not tag page with extension URL');
-  console.log('(data-quoth-ext-url not found on <html> element)');
-  await browser.close();
-  process.exit(1);
+// Check if any moz-extension:// pages are already visible
+for (const p of context.pages()) {
+  const match = p.url().match(/moz-extension:\/\/[a-f0-9-]+\//);
+  if (match) {
+    extensionBaseUrl = match[0];
+    break;
+  }
 }
 
-console.log(`Extension base URL: ${extensionBaseUrl}`);
+if (!extensionBaseUrl) {
+  // Fallback: open YouTube to trigger extension activity, then re-check
+  console.log('No extension pages found, opening YouTube to trigger extension...');
+  await discoveryPage.goto('https://www.youtube.com/watch?v=' + videoId, {
+    waitUntil: 'load',
+    timeout: 30000,
+  });
+  await discoveryPage.waitForTimeout(5000);
 
-// Close the YouTube page (no longer needed) and open the watch page
-await ytPage.close();
+  for (const p of context.pages()) {
+    const match = p.url().match(/moz-extension:\/\/[a-f0-9-]+\//);
+    if (match) {
+      extensionBaseUrl = match[0];
+      break;
+    }
+  }
+}
+
+await discoveryPage.close();
 
 const watchUrl = `${extensionBaseUrl}watch.html?v=${videoId}&t=30`;
 console.log(`Opening watch page: ${watchUrl}`);
