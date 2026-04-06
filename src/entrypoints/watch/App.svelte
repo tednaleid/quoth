@@ -11,7 +11,7 @@
   } from '../../core/playback-sync';
   import type { TimedWord, VideoInfo } from '../../core/types';
   import type { EmbedMessage } from '../../messages';
-  import TranscriptView from '../sidepanel/components/TranscriptView.svelte';
+  import TranscriptView from '../../components/TranscriptView.svelte';
 
   const SEGMENT_GAP_MS = 2000;
   const params = parseWatchParams(window.location.search);
