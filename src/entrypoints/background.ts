@@ -46,7 +46,7 @@ export default defineBackground(() => {
     if (import.meta.env.BROWSER === 'firefox') {
       if (videoId) {
         browser.browserAction?.enable(tabId);
-        // Tag the page with the extension URL so Playwright can discover the UUID
+        // Tag the page with the extension URL so Playwright can discover the UUID.
         browser.tabs
           .executeScript(tabId, {
             code: `document.documentElement.dataset.quothExtUrl = ${JSON.stringify(extUrl)}`,
