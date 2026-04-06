@@ -9,20 +9,23 @@ export default defineBackground(() => {
   const sidebarHost = createSidebarHost(import.meta.env.BROWSER);
   sidebarHost.initialize();
 
-  // Firefox MV2: webRequest API for header modifications (Chrome uses declarativeNetRequest rules)
-  // Only set up if declarativeNetRequest is not available (i.e., Firefox)
-  if (typeof browser.declarativeNetRequest === 'undefined') {
+  // Firefox MV2: webRequest API for header modifications (Chrome uses declarativeNetRequest rules).
+  // Firefox MV2 does not support declarativeNetRequest, so we use the older webRequest API
+  // to apply the same header modifications: strip Origin on Innertube, set Referer for embeds.
+  if (import.meta.env.BROWSER === 'firefox') {
+    const extensionOrigin = browser.runtime.getURL('');
+    console.log('[quoth] registering Firefox webRequest header handler');
     browser.webRequest.onBeforeSendHeaders.addListener(
       (details) => {
-        if (!details.requestHeaders) return {};
-        // Only modify requests originating from our extension.
-        // Firefox provides originUrl (not in Chrome types), Chrome provides initiator.
-        const origin = (details as { originUrl?: string }).originUrl ?? details.initiator;
-        if (origin && !origin.startsWith(browser.runtime.getURL(''))) {
-          return {};
+        if (!details.requestHeaders) return { requestHeaders: details.requestHeaders };
+        // Only modify requests originating from our extension (moz-extension://...).
+        // Leave normal YouTube browsing untouched.
+        const originUrl = (details as { originUrl?: string }).originUrl;
+        if (originUrl && !originUrl.startsWith(extensionOrigin)) {
+          return { requestHeaders: details.requestHeaders };
         }
+        console.log(`[quoth] modifying headers for: ${details.url.slice(0, 80)}`);
         const headers = details.requestHeaders.filter((h) => h.name.toLowerCase() !== 'origin');
-        // Set Referer for embed playback (YouTube requires it)
         const hasReferer = headers.some((h) => h.name.toLowerCase() === 'referer');
         if (!hasReferer) {
           headers.push({ name: 'Referer', value: 'https://quoth.local/' });
