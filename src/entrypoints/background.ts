@@ -6,7 +6,7 @@ import { createSidebarHost } from '../adapters/sidebar-host-factory';
 //   content -> sidebar:  browser.runtime.sendMessage() broadcasts to all extension contexts
 //   sidebar -> content:  browser.tabs.sendMessage(tabId) targets the content script directly
 export default defineBackground(() => {
-  console.log('[quoth] background started');
+  console.log(`[quoth] background started, extension URL: ${browser.runtime.getURL('')}`);
 
   // Register webRequest handler FIRST (before sidebar init which may fail).
   // Firefox MV2: webRequest API for header modifications (Chrome uses declarativeNetRequest rules).
@@ -19,9 +19,10 @@ export default defineBackground(() => {
       (details) => {
         if (!details.requestHeaders) return { requestHeaders: details.requestHeaders };
         // Only modify requests originating from our extension (moz-extension://...).
-        // Leave normal YouTube browsing untouched.
+        // Leave normal YouTube browsing untouched. When originUrl is absent
+        // (e.g. top-level navigations), do NOT modify — safe default is pass-through.
         const originUrl = (details as { originUrl?: string }).originUrl;
-        if (originUrl && !originUrl.startsWith(extensionOrigin)) {
+        if (!originUrl || !originUrl.startsWith(extensionOrigin)) {
           return { requestHeaders: details.requestHeaders };
         }
         console.log(`[quoth] modifying headers for: ${details.url.slice(0, 80)}`);
