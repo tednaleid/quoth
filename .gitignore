@@ -1,4 +1,5 @@
 .superpowers/
+.worktrees/
 
 # WXT / build output
 .output/
