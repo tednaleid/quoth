@@ -41,6 +41,7 @@ export default defineConfig({
         ],
       },
     }),
+    action: {},
     browser_specific_settings: {
       gecko: {
         id: 'quoth@tednaleid.com',
