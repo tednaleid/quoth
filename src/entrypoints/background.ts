@@ -38,12 +38,20 @@ export default defineBackground(() => {
     browser.action.disable();
   }
 
+  const extUrl = browser.runtime.getURL('');
+
   browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (!changeInfo.url && changeInfo.status !== 'complete') return;
     const videoId = tab.url ? extractVideoId(tab.url) : null;
     if (import.meta.env.BROWSER === 'firefox') {
       if (videoId) {
         browser.browserAction?.enable(tabId);
+        // Tag the page with the extension URL so Playwright can discover the UUID
+        browser.tabs
+          .executeScript(tabId, {
+            code: `document.documentElement.dataset.quothExtUrl = ${JSON.stringify(extUrl)}`,
+          })
+          .catch(() => {});
       } else {
         browser.browserAction?.disable(tabId);
       }

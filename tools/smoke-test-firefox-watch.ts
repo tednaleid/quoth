@@ -17,43 +17,33 @@ const firefoxWithExt = withExtension(firefox, extensionPath);
 const browser = await firefoxWithExt.launch({ headless: false });
 const context = await browser.newContext();
 
-// Discover the extension UUID. The deleted content script used to tag the page
-// with data-quoth-ext-url. Now we find it via about:addons or context pages.
-console.log('Discovering extension UUID...');
-let extensionBaseUrl: string | null = null;
+// Discover the extension UUID by opening a YouTube page. The background script
+// tags YouTube /watch pages with data-quoth-ext-url via tabs.executeScript.
+console.log('Opening YouTube to discover extension UUID...');
+const ytPage = await context.newPage();
+ytPage.on('console', (msg) => {
+  if (msg.text().includes('[quoth')) console.log(`[YT] ${msg.text()}`);
+});
 
-// Give the background script time to start
-const discoveryPage = await context.newPage();
-await discoveryPage.waitForTimeout(2000);
+await ytPage.goto('https://www.youtube.com/watch?v=' + videoId, {
+  waitUntil: 'load',
+  timeout: 30000,
+});
+await ytPage.waitForTimeout(5000);
 
-// Check if any moz-extension:// pages are already visible
-for (const p of context.pages()) {
-  const match = p.url().match(/moz-extension:\/\/[a-f0-9-]+\//);
-  if (match) {
-    extensionBaseUrl = match[0];
-    break;
-  }
-}
+const extensionBaseUrl = await ytPage.evaluate(
+  () => document.documentElement.dataset.quothExtUrl ?? null,
+);
 
 if (!extensionBaseUrl) {
-  // Fallback: open YouTube to trigger extension activity, then re-check
-  console.log('No extension pages found, opening YouTube to trigger extension...');
-  await discoveryPage.goto('https://www.youtube.com/watch?v=' + videoId, {
-    waitUntil: 'load',
-    timeout: 30000,
-  });
-  await discoveryPage.waitForTimeout(5000);
-
-  for (const p of context.pages()) {
-    const match = p.url().match(/moz-extension:\/\/[a-f0-9-]+\//);
-    if (match) {
-      extensionBaseUrl = match[0];
-      break;
-    }
-  }
+  console.log('SMOKE TEST FAILED: background script did not tag page with extension URL');
+  console.log('(data-quoth-ext-url not found on <html> element)');
+  await browser.close();
+  process.exit(1);
 }
 
-await discoveryPage.close();
+console.log(`Extension base URL: ${extensionBaseUrl}`);
+await ytPage.close();
 
 const watchUrl = `${extensionBaseUrl}watch.html?v=${videoId}&t=30`;
 console.log(`Opening watch page: ${watchUrl}`);
@@ -79,15 +69,17 @@ try {
 } catch {
   console.log('Transcript did not load (.word not found). Dumping diagnostics...');
   const html = await page.content().catch(() => 'COULD NOT READ CONTENT');
-  const diag = await page.evaluate(() => ({
-    url: window.location.href,
-    htmlLen: document.documentElement.outerHTML.length,
-    main: document.querySelectorAll('main').length,
-    h1: document.querySelector('h1')?.textContent ?? 'NONE',
-    iframe: document.querySelectorAll('iframe').length,
-    placeholder: document.querySelector('.placeholder')?.textContent ?? 'NONE',
-    bodyText: document.body?.textContent?.slice(0, 300) ?? 'EMPTY',
-  })).catch(() => ({ error: 'evaluate failed' }));
+  const diag = await page
+    .evaluate(() => ({
+      url: window.location.href,
+      htmlLen: document.documentElement.outerHTML.length,
+      main: document.querySelectorAll('main').length,
+      h1: document.querySelector('h1')?.textContent ?? 'NONE',
+      iframe: document.querySelectorAll('iframe').length,
+      placeholder: document.querySelector('.placeholder')?.textContent ?? 'NONE',
+      bodyText: document.body?.textContent?.slice(0, 300) ?? 'EMPTY',
+    }))
+    .catch(() => ({ error: 'evaluate failed' }));
   console.log('Diagnostics:', JSON.stringify(diag, null, 2));
   console.log('\nSMOKE TEST FAILED');
   await browser.close();
@@ -110,7 +102,9 @@ console.log('Waiting for embed content script to report playback time...');
 try {
   await page.waitForSelector('.word.active-word', { timeout: 15000 });
 } catch {
-  console.log('WARNING: No active-word highlight detected (embed content script may not have connected)');
+  console.log(
+    'WARNING: No active-word highlight detected (embed content script may not have connected)',
+  );
   console.log('Transcript loaded but live playback tracking not confirmed');
 }
 
