@@ -27,7 +27,7 @@ export default defineConfig({
       'unlimitedStorage',
       ...(browser === 'firefox'
         ? ['webRequest', 'webRequestBlocking']
-        : ['declarativeNetRequestWithHostAccess']),
+        : ['declarativeNetRequestWithHostAccess', 'scripting']),
     ],
     host_permissions: ['*://*.youtube.com/*'],
     ...(browser !== 'firefox' && {
@@ -41,9 +41,6 @@ export default defineConfig({
         ],
       },
     }),
-    side_panel: {
-      default_path: 'sidepanel/index.html',
-    },
     browser_specific_settings: {
       gecko: {
         id: 'quoth@tednaleid.com',
