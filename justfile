@@ -75,9 +75,13 @@ debug-firefox *URL:
     just build
     bun run tools/debug-firefox.ts {{URL}}
 
-# Run model comparison harness (Phase 4+)
+# Download a YouTube transcript (URL or video ID, saves to .llm/ by default)
+transcript *ARGS:
+    bun run tools/transcript.ts {{ARGS}}
+
+# Run model comparison harness against transcript fixtures
 model-bench *ARGS:
-    @echo "Model bench not yet implemented (Phase 4)"
+    bun run tools/model-bench/bench.ts {{ARGS}}
 
 # Capture YouTube page fixture for testing
 fixture-capture URL *NAME:

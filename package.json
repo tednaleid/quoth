@@ -34,5 +34,12 @@
     "typescript-eslint": "^8.58.0",
     "vitest": "^4.1.2",
     "wxt": "^0.20.20"
-  }
+  },
+  "dependencies": {
+    "diff": "^8.0.4",
+    "punctuation-restore": "^0.1.0"
+  },
+  "trustedDependencies": [
+    "onnxruntime-node"
+  ]
 }
