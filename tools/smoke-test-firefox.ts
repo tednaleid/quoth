@@ -1,13 +1,13 @@
 #!/usr/bin/env -S bun run
 /**
- * ABOUTME: Firefox tab-mode smoke test -- verifies side panel renders in Gecko engine.
- * ABOUTME: Serves the built sidepanel via local HTTP, opens it in Playwright Firefox.
+ * ABOUTME: Firefox smoke test -- verifies side panel and popout render in Gecko engine.
+ * ABOUTME: Serves the built pages via local HTTP with browser API stubs, opens in Playwright Firefox.
  */
 
 import { firefox } from 'playwright';
 import path from 'path';
 
-// Find the built sidepanel HTML in the Firefox build output
+// Find the built output in the Firefox build directory
 const outputDirs = ['.output/firefox-mv3', '.output/firefox-mv2'];
 let outputDir: string | null = null;
 
@@ -60,12 +60,16 @@ await page.addInitScript(() => {
       id: 'quoth-test-stub',
       onMessage: stubListener,
       sendMessage: promiseResolve,
+      getURL: (path: string) => `stub-extension://${path}`,
     },
     tabs: {
       query: promiseResolveEmpty,
       get: promiseResolve,
       sendMessage: promiseResolve,
+      create: promiseResolve,
       onActivated: stubListener,
+      onRemoved: stubListener,
+      onUpdated: stubListener,
     },
   };
 });
@@ -74,13 +78,13 @@ await page.addInitScript(() => {
 const errors: string[] = [];
 page.on('pageerror', (err) => errors.push(err.message));
 
+// --- Sidepanel rendering test ---
 const targetUrl = `${baseUrl}/sidepanel.html`;
 console.log(`Opening: ${targetUrl}`);
 
 await page.goto(targetUrl, { waitUntil: 'load', timeout: 15000 });
 await page.waitForTimeout(2000);
 
-// Verify Svelte app mounted
 const mainEl = await page.locator('main').count();
 if (mainEl === 0) {
   console.log('FIREFOX SMOKE TEST FAILED: Svelte app did not mount (<main> not found)');
@@ -90,13 +94,11 @@ if (mainEl === 0) {
   server.stop();
   process.exit(1);
 }
-console.log('Svelte app mounted: <main> element present');
+console.log('Sidepanel mounted: <main> element present');
 
-// Check for the status bar
 const statusBarCount = await page.locator('.status-bar').count();
 console.log(`Status bar rendered: ${statusBarCount > 0}`);
 
-// Check for the placeholder text (initial state)
 const placeholderText = await page
   .locator('.placeholder p')
   .textContent()
@@ -105,12 +107,36 @@ if (placeholderText) {
   console.log(`Initial placeholder: "${placeholderText.trim()}"`);
 }
 
+// --- Popout page rendering test ---
+console.log('\n--- Popout page test ---');
+const popoutUrl = `${baseUrl}/popout.html?tabId=1`;
+console.log(`Opening: ${popoutUrl}`);
+await page.goto(popoutUrl, { waitUntil: 'load', timeout: 15000 });
+await page.waitForTimeout(2000);
+
+const popoutMainEl = await page.locator('main').count();
+if (popoutMainEl === 0) {
+  console.log('FIREFOX SMOKE TEST FAILED: Popout app did not mount (<main> not found)');
+  await browser.close();
+  server.stop();
+  process.exit(1);
+}
+console.log('Popout app mounted: <main> element present');
+
+const popoutPlaceholder = await page
+  .locator('.placeholder p')
+  .textContent()
+  .catch(() => null);
+if (popoutPlaceholder) {
+  console.log(`Popout placeholder: "${popoutPlaceholder.trim()}"`);
+}
+
 // Report JS errors for visibility (not a failure condition -- expected outside extension)
 if (errors.length > 0) {
   console.log(`\nJS errors (expected for non-extension context):`);
   errors.forEach((e) => console.log(`  - ${e}`));
 }
 
-console.log('\nFIREFOX SMOKE TEST PASSED: Side panel renders in Gecko engine');
+console.log('\nFIREFOX SMOKE TEST PASSED: Side panel and popout render in Gecko engine');
 await browser.close();
 server.stop();

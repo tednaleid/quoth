@@ -46,6 +46,10 @@ build BROWSER="firefox":
 dev BROWSER="firefox" URL="":
     QUOTH_START_URL={{URL}} bunx wxt --browser {{BROWSER}}
 
+# Start dev mode for popout tab (right-click extension icon -> "Open in new tab")
+dev-popout BROWSER="firefox" URL="":
+    QUOTH_START_URL={{URL}} bunx wxt --browser {{BROWSER}}
+
 # Clean build artifacts and caches (also clears dev browser profiles)
 clean:
     rm -rf .output .wxt node_modules/.vite
@@ -61,15 +65,10 @@ install-hooks:
     @chmod +x .git/hooks/pre-commit
     @echo "Pre-commit hook installed."
 
-# Smoke test: load Chrome extension and navigate to YouTube (Chromium only -- Playwright cannot load Firefox extensions)
-smoke-test *URL:
-    just build chrome
-    bun run tools/smoke-test.ts {{URL}}
-
-# Firefox tab-mode smoke test: verify side panel renders in Gecko engine
-smoke-test-firefox:
-    just build
-    bun run tools/smoke-test-firefox.ts
+# Smoke test: load extension and verify transcript flow (default: chrome, or: just smoke-test firefox)
+smoke-test BROWSER="chrome" *URL:
+    just build {{ if BROWSER == "chrome" { "chrome" } else { "" } }}
+    bun run tools/smoke-test-{{BROWSER}}.ts {{URL}}
 
 # Debug Firefox extension: load built extension, navigate to YouTube, log all console output
 debug-firefox *URL:

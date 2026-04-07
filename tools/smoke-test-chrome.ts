@@ -109,5 +109,56 @@ if (wordStart && timeAfter !== null) {
   }
 }
 
+// --- Popout tab test ---
+console.log('\n--- Popout tab test ---');
+const popoutPage = await context.newPage();
+popoutPage.on('console', (m) => {
+  if (m.text().includes('[quoth')) console.log(`[PO] ${m.text()}`);
+});
+popoutPage.on('pageerror', (e) => console.log(`[PO ERROR] ${e.message}`));
+
+const ytTabId = await ytPage.evaluate(() => {
+  // The ytPage doesn't know its own tab ID, but the side panel connected to it.
+  // We'll use the extension URL with the tab ID we can infer.
+  return null;
+});
+
+// Get the YouTube tab ID from the side panel's state by reading the popout button behavior.
+// Simpler: just open the popout page pointed at the YouTube page's tab ID.
+// We know the sidepanel was connected to the YouTube tab, so we can extract the tabId
+// from the sidepanel page URL or by navigating directly.
+// The extension ID is already known; the YouTube tab ID can be found via the extension.
+const allTabs = await context.pages();
+const ytTabIds = await background.evaluate(async () => {
+  const tabs = await chrome.tabs.query({ url: '*://*.youtube.com/watch*' });
+  return tabs.map((t: { id?: number }) => t.id);
+});
+const popoutTabId = ytTabIds[0];
+console.log(`YouTube tab ID for popout: ${popoutTabId}`);
+
+if (popoutTabId) {
+  await popoutPage.goto(`chrome-extension://${extensionId}/popout.html?tabId=${popoutTabId}`);
+  await popoutPage.waitForTimeout(5000);
+
+  const popoutHeader = await popoutPage.locator('h1').textContent();
+  const popoutHasTranscript = (await popoutPage.locator('.transcript').count()) > 0;
+  const popoutWordCount = popoutHasTranscript ? await popoutPage.locator('.word').count() : 0;
+
+  console.log(`Popout header: ${popoutHeader}`);
+  console.log(`Popout transcript: ${popoutHasTranscript}, Words: ${popoutWordCount}`);
+
+  if (!popoutHasTranscript || popoutWordCount === 0) {
+    console.log('\nSMOKE TEST FAILED: Popout tab has no transcript');
+    await popoutPage.screenshot({ path: '.output/smoke-test-popout-failure.png' });
+    console.log('Screenshot saved to .output/smoke-test-popout-failure.png');
+    await context.close();
+    process.exit(1);
+  }
+
+  console.log('Popout tab: WORKING');
+} else {
+  console.log('WARNING: Could not find YouTube tab ID for popout test');
+}
+
 console.log('\nSMOKE TEST PASSED');
 await context.close();

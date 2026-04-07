@@ -10,6 +10,9 @@ import type { ContentMessage, SidePanelMessage } from '../messages';
 export default defineContentScript({
   matches: ['*://*.youtube.com/watch*'],
   main() {
+    // Expose extension URL on the DOM so Playwright smoke tests can discover it
+    document.documentElement.dataset.quothExtUrl = browser.runtime.getURL('/');
+
     let currentVideoId: string | null = null;
     let stopTimeUpdates: (() => void) | null = null;
 
@@ -91,6 +94,17 @@ export default defineContentScript({
 
     document.addEventListener('yt-navigate-finish', () => {
       handleVideoPage();
+    });
+
+    // Listen for page-open requests via postMessage (used by smoke tests in Firefox
+    // where Playwright cannot navigate directly to moz-extension:// URLs)
+    window.addEventListener('message', (e) => {
+      if (e.data?.type === 'quoth-open-page') {
+        const page = e.data.page;
+        if (page === 'sidepanel' || page === 'popout') {
+          browser.runtime.sendMessage({ type: 'open-page', page }).catch(() => {});
+        }
+      }
     });
   },
 });

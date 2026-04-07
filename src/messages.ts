@@ -15,3 +15,6 @@ export type ContentMessage =
 
 // Side panel -> Content script (via background)
 export type SidePanelMessage = { type: 'seek-to'; timeMs: number } | { type: 'request-state' };
+
+// Content script -> Background (internal commands)
+export type InternalMessage = { type: 'open-page'; page: 'sidepanel' | 'popout'; tabId: number };
