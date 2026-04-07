@@ -20,42 +20,88 @@ Three layers of verification, each catching a different class of bug. Cheap fast
 
 ## Layer 2: Smoke tests (Playwright + real browser)
 
-**Commands:**
-- `just smoke-test` -- Chrome watch page (Chromium + real extension)
-- `just smoke-test-firefox-watch` -- Firefox watch page (Gecko engine)
+**Command:** `just smoke-test [browser]` (default: chrome)
 
-**Speed:** ~15-30s each. They build the extension, launch the browser with the extension loaded, hit real YouTube, and assert on actual DOM + network behavior.
+**Speed:** ~15-30s. Builds the extension, launches a browser, hits real
+YouTube, and asserts on actual DOM + network behavior.
 
-### `just smoke-test` verifies
+### Chrome smoke test (`just smoke-test` or `just smoke-test chrome`)
 
+Full integration test. Playwright loads the real Chrome extension via
+`--load-extension`, navigates to YouTube, and opens extension pages
+(`chrome-extension://<id>/sidepanel.html`, `popout.html`) as regular tabs.
+
+**Verifies:**
 1. Extension loads and manifest is valid
-2. Watch page loads at `chrome-extension://<id>/watch.html?v=...&t=...`
-3. DNR rules correctly rewrite the `Origin` and `Referer` headers so YouTube's Innertube API and embed player accept requests from the `chrome-extension://` origin
-4. Embed iframe loads and the YouTube video plays
-5. The `youtube.com/embed/*` content script injects into the iframe (`allFrames: true`) and polls the `<video>` element's `currentTime` every 250ms
-6. Time updates flow via `browser.runtime.sendMessage` from content script to watch page, driving active-word highlighting
-7. Clicking a transcript word sends `browser.tabs.sendMessage({frameId})` to the content script, which sets `video.currentTime = X` (verified by the active-word highlight jumping to the clicked timestamp)
-8. Live playback tracking works: after a click + 1.5s wait, the active-word highlight has advanced further than the clicked position
-9. `ChromeStorageLocalCache` works: reloading the page re-renders the transcript in <500ms (implicit cache hit)
+2. Content script injects on YouTube and extracts captions via Innertube
+3. Sidepanel (opened as tab) receives transcript and renders 6000+ words
+4. Click-to-seek: clicking a word in the transcript seeks the YouTube video
+5. Popout tab: loads pinned to the YouTube tab, receives the same transcript
 
-### `just smoke-test-firefox-watch` verifies
+### Firefox smoke test (`just smoke-test firefox`)
 
-The same flows as above but through Gecko and the Firefox embed intermediary path (GitHub Pages wrapper). Confirms Firefox-specific header handling and the moz-extension:// origin fix work end-to-end.
+Rendering-only test. Serves the built extension pages via a local HTTP
+server with stubbed browser APIs, opens them in Playwright Firefox.
 
-**Why smoke tests matter:** they catch integration-layer bugs that unit tests cannot.
+**Verifies:**
+1. Sidepanel Svelte app mounts in the Gecko engine (`<main>` present)
+2. Popout Svelte app mounts in the Gecko engine (`<main>` present)
+3. Status bar and placeholder text render correctly
+
+**Does NOT verify:** real extension loading, YouTube interaction, transcript
+loading, click-to-seek, or cross-context messaging. See the Playwright
+Firefox limitation section below.
+
+### Playwright Firefox limitation
+
+Playwright controls Firefox through Juggler, a custom protocol patched into
+Firefox's source. Juggler cannot inject its runtime scripts into privileged
+`moz-extension://` browsing contexts. This means `page.goto('moz-extension://...')`
+times out and `page.evaluate()` / `page.click()` throw protocol errors on
+extension pages. This is a hard security boundary in Firefox, not a config issue.
+
+**Approaches that do not work:**
+- `waitUntil: 'domcontentloaded'` or `'commit'` -- still times out
+- `launchPersistentContext` -- same result
+- UUID pre-seeding via `extensions.webextensions.uuids` pref -- UUID is
+  assigned correctly but navigation still blocked
+- `about:debugging` -- also inaccessible from Playwright
+- Content script relay (`postMessage` -> `browser.runtime.sendMessage` ->
+  background -> `browser.tabs.create`) -- even if the background creates
+  the tab, Playwright cannot interact with the resulting extension page
+
+**What does work in Firefox Playwright:**
+- `playwright-webextext` installs the extension via remote debugging protocol
+- Content scripts execute on YouTube pages (verified via DOM attributes)
+- Extension effects on web pages are observable
+
+**Path to full Firefox integration testing:** Selenium with GeckoDriver
+uses Mozilla's Marionette protocol, which operates at a higher privilege
+level and can navigate to and interact with `moz-extension://` pages.
+UUID pre-seeding works with Selenium. This would be added when CI parity
+is needed; for now, `just dev firefox` and `just debug-firefox` provide
+interactive Firefox verification.
+
+### Why smoke tests matter
+
+They catch integration-layer bugs that unit tests cannot.
 
 Examples of bugs previously caught only by smoke tests:
-- **"Illegal invocation" fetch binding**: `this.fetchFn = fetch` stored as a class property loses `this === window` in Chrome. Fixed with arrow-function wrapping.
-- **Origin-header block on Innertube from extension contexts**: YouTube returns 403 "Sorry..." abuse pages when `Origin: chrome-extension://...` is present. Fixed with a DNR rule stripping the header.
-- **Embed referrer requirement**: YouTube's embed player rejects playback with "Error 153" when Referer is missing (extension pages don't send one). Fixed with a DNR rule setting a synthetic referer.
-- **postMessage origin restriction**: YouTube's IFrame Player API refuses to send `infoDelivery` events back to `chrome-extension://` parent origins. Worked around with a content script polling the iframe's `<video>` element directly.
+- **"Illegal invocation" fetch binding**: `this.fetchFn = fetch` stored
+  as a class property loses `this === window` in Chrome
+- **Origin-header block on Innertube**: YouTube returns 403 when
+  `Origin: chrome-extension://...` is present
+- **postMessage origin restriction**: YouTube's IFrame Player API refuses
+  events to `chrome-extension://` parent origins
 
-**When to run:** after any change to adapters, entrypoints, manifest, or messaging. Always before claiming a feature works.
+**When to run:** after any change to adapters, entrypoints, manifest, or
+messaging. Always before claiming a feature works.
 
 ## Layer 3: Interactive / manual verification
 
 **Commands:**
 - `just dev firefox '<url>'` or `just dev chrome '<url>'` -- dev mode with persistent profile
+- `just dev-popout firefox '<url>'` -- dev mode focused on popout tab workflow
 - `just debug-firefox '<url>'` -- Firefox with console logging forwarded to stdout
 
 **When to use:**

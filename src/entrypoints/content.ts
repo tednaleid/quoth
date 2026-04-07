@@ -97,12 +97,20 @@ export default defineContentScript({
     });
 
     // Listen for page-open requests via postMessage (used by smoke tests in Firefox
-    // where Playwright cannot navigate directly to moz-extension:// URLs)
-    window.addEventListener('message', (e) => {
+    // where Playwright cannot navigate directly to moz-extension:// URLs).
+    // Uses retry because content scripts can initialize before the background
+    // script registers its onMessage listener (Firefox bug #1369841).
+    window.addEventListener('message', async (e) => {
       if (e.data?.type === 'quoth-open-page') {
         const page = e.data.page;
-        if (page === 'sidepanel' || page === 'popout') {
-          browser.runtime.sendMessage({ type: 'open-page', page }).catch(() => {});
+        if (page !== 'sidepanel' && page !== 'popout') return;
+        for (let attempt = 0; attempt < 10; attempt++) {
+          try {
+            await browser.runtime.sendMessage({ type: 'open-page', page });
+            return;
+          } catch {
+            await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
+          }
         }
       }
     });
