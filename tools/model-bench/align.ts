@@ -1,61 +1,39 @@
 /**
- * ABOUTME: Maps punctuated/cased text back to original TimedWord timestamps via jsdiff.
+ * ABOUTME: Maps punctuated/cased text back to original TimedWord timestamps.
  * ABOUTME: Pure function -- will eventually move to src/core/ once proven correct.
  */
 
-import { diffWords } from 'diff';
 import type { TimedWord } from '../../src/core/types';
 
 /**
- * Align formatted text back to original word timestamps using jsdiff.
+ * Align formatted words back to original word timestamps.
  *
- * The model changes text (adds punctuation, fixes casing) but we need to
- * preserve the original word-level timestamps. This function uses diffWords
- * to find the correspondence between original and formatted words, then
- * maps each formatted word to the closest original word's timestamp.
+ * The punctuation model processes words in order and produces one output
+ * word per input word (with optional punctuation attached). This function
+ * splits the formatted text into words and maps them 1:1 to the original
+ * TimedWord timestamps.
+ *
+ * If the formatted output has fewer words than the original (due to chunking
+ * edge effects), remaining original words are passed through unchanged.
+ * If it has more words (shouldn't happen), extras are dropped.
  */
 export function alignTimestamps(original: TimedWord[], formattedText: string): TimedWord[] {
-  const originalText = original.map((w) => w.text).join(' ');
-  const changes = diffWords(originalText, formattedText, { ignoreCase: true });
-
+  const formattedWords = formattedText.split(/\s+/).filter((w) => w.length > 0);
   const result: TimedWord[] = [];
-  let origCursor = 0;
 
-  for (const change of changes) {
-    const words = change.value.trim().split(/\s+/).filter((w) => w.length > 0);
-    if (words.length === 0) continue;
+  const count = Math.min(original.length, formattedWords.length);
+  for (let i = 0; i < count; i++) {
+    result.push({
+      text: formattedWords[i],
+      start: original[i].start,
+      end: original[i].end,
+      original: original[i].original,
+    });
+  }
 
-    if (!change.added && !change.removed) {
-      // Unchanged words (ignoring case): emit with original timestamps
-      for (const word of words) {
-        if (origCursor < original.length) {
-          result.push({
-            text: word,
-            start: original[origCursor].start,
-            end: original[origCursor].end,
-            original: original[origCursor].original,
-          });
-          origCursor++;
-        }
-      }
-    } else if (change.removed && !change.added) {
-      // Words removed by the model (rare) -- skip, advance cursor
-      origCursor += words.length;
-    } else if (change.added && !change.removed) {
-      // Words added by the model (punctuation attached to words, new words)
-      // Map each to the next available original word's timestamp
-      for (const word of words) {
-        if (origCursor < original.length) {
-          result.push({
-            text: word,
-            start: original[origCursor].start,
-            end: original[origCursor].end,
-            original: original[origCursor].original,
-          });
-          origCursor++;
-        }
-      }
-    }
+  // Pass through any remaining original words that weren't covered
+  for (let i = count; i < original.length; i++) {
+    result.push({ ...original[i] });
   }
 
   return result;

@@ -7,9 +7,9 @@
 import { parseArgs } from 'node:util';
 import { mkdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import PunctuationRestorer from 'punctuation-restore';
 import { parseJson3Captions } from '../../src/core/caption-parser';
 import type { TimedWord } from '../../src/core/types';
+import { PunctuationAdapter } from './punctuation-adapter';
 import { alignTimestamps } from './align';
 import { printReport, toMarkdown, type BenchResult } from './report';
 
@@ -71,9 +71,9 @@ if (fixtureName.endsWith('.json')) {
 durationMs = words.length > 0 ? words[words.length - 1].end : 0;
 console.log(`Loaded ${words.length} words from ${fixtureName} (${(durationMs / 1000 / 60).toFixed(1)} min)`);
 
-// Prepare input: join all words into chunks the model can handle
-// The model's tokenizer has a 512-token limit, so we chunk by ~400 words
-const CHUNK_SIZE = 400;
+// The model's SentencePiece tokenizer expands words into subtokens.
+// A 512-token limit means ~300 words per chunk to stay safe.
+const CHUNK_SIZE = 300;
 const chunks: string[] = [];
 for (let i = 0; i < words.length; i += CHUNK_SIZE) {
   const chunk = words.slice(i, i + CHUNK_SIZE);
@@ -81,21 +81,24 @@ for (let i = 0; i < words.length; i += CHUNK_SIZE) {
 }
 console.log(`Split into ${chunks.length} chunks of ~${CHUNK_SIZE} words`);
 
-// Run the model
+// Run the model with proper SentencePiece tokenization
 console.log('\nLoading model...');
-const loadStart = performance.now();
-const restorer = new PunctuationRestorer();
-await restorer.initialize();
-const loadTimeMs = performance.now() - loadStart;
+const adapter = new PunctuationAdapter();
+const loadTimeMs = await adapter.load();
 console.log(`Model loaded in ${(loadTimeMs / 1000).toFixed(1)}s`);
 
 console.log('Running inference...');
 const inferenceStart = performance.now();
-const sentences = await restorer.restore(chunks);
+const formattedChunks: string[] = [];
+for (const chunk of chunks) {
+  const result = await adapter.process(chunk);
+  formattedChunks.push(result.text);
+}
 const inferenceTimeMs = performance.now() - inferenceStart;
 console.log(`Inference complete in ${(inferenceTimeMs / 1000).toFixed(1)}s`);
+await adapter.dispose();
 
-const formattedText = sentences.join(' ');
+const formattedText = formattedChunks.join(' ');
 const rawText = words.map((w) => w.text).join(' ');
 
 // Align timestamps
@@ -104,9 +107,8 @@ const alignedWords = alignTimestamps(words, formattedText);
 console.log(`Aligned ${alignedWords.length} words (original: ${words.length})`);
 
 const notes: string[] = [
-  'punctuation-restore uses a simplified tokenizer (maps all words to UNK)',
-  'Model quality is degraded -- actual 1-800-BAD-CODE model needs SentencePiece tokenization',
-  'This run evaluates the pipeline/alignment, not the model at its best',
+  'Using proper SentencePiece tokenization (not punctuation-restore broken tokenizer)',
+  'Model trained on formal written text; quality on informal spoken transcripts may vary',
 ];
 
 const result: BenchResult = {

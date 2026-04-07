@@ -37,7 +37,8 @@
   },
   "dependencies": {
     "diff": "^8.0.4",
-    "punctuation-restore": "^0.1.0"
+    "punctuation-restore": "^0.1.0",
+    "sentencepiece-js": "^1.1.0"
   },
   "trustedDependencies": [
     "onnxruntime-node"
