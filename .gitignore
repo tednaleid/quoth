@@ -1,4 +1,6 @@
 .superpowers/
+.worktrees/
+.veer/veer.db
 
 # WXT / build output
 .output/

@@ -1,0 +1,141 @@
+# veer rules - evaluated in order, first match wins.
+# Run 'veer list' to see active rules, 'veer test "<cmd>"' to preview behavior.
+# See .claude/skills/veer/SKILL.md for a guide on adding rules.
+
+[[rule]]
+id = "no-curl-pipe-shell"
+name = "Block curl piped to a shell"
+action = "reject"
+message = "Don't pipe curl to bash/sh -- download, inspect, then execute."
+[rule.match]
+command_all = ["curl", "bash"]
+
+# --- Redirect underlying tools to justfile recipes ---
+
+[[rule]]
+id = "use-just-test-vitest"
+name = "Redirect vitest to just test"
+action = "reject"
+message = "Use `just test` (or `just test <pattern>`) instead of running vitest directly."
+[rule.match]
+command = "vitest"
+
+[[rule]]
+id = "use-just-test-bunx-vitest"
+name = "Redirect bunx vitest to just test"
+action = "reject"
+message = "Use `just test` (or `just test <pattern>`) instead of running vitest via bunx."
+[rule.match]
+command = "bunx"
+arg = "vitest"
+
+[[rule]]
+id = "use-just-lint-eslint"
+name = "Redirect eslint to just lint"
+action = "reject"
+message = "Use `just lint` (or `just lint <files>`) instead of running eslint directly."
+[rule.match]
+command = "eslint"
+
+[[rule]]
+id = "use-just-lint-bunx-eslint"
+name = "Redirect bunx eslint to just lint"
+action = "reject"
+message = "Use `just lint` (or `just lint <files>`) instead of running eslint via bunx."
+[rule.match]
+command = "bunx"
+arg = "eslint"
+
+[[rule]]
+id = "use-just-fmt-prettier"
+name = "Redirect prettier to just fmt"
+action = "reject"
+message = "Use `just fmt` (or `just fmt <files>`) to format, or `just fmt-check` to check."
+[rule.match]
+command = "prettier"
+
+[[rule]]
+id = "use-just-fmt-bunx-prettier"
+name = "Redirect bunx prettier to just fmt"
+action = "reject"
+message = "Use `just fmt` (or `just fmt <files>`) to format, or `just fmt-check` to check."
+[rule.match]
+command = "bunx"
+arg = "prettier"
+
+[[rule]]
+id = "use-just-typecheck-tsc"
+name = "Redirect tsc to just typecheck"
+action = "reject"
+message = "Use `just typecheck` instead of running tsc directly. It runs `wxt prepare` first."
+[rule.match]
+command = "tsc"
+
+[[rule]]
+id = "use-just-typecheck-bunx-tsc"
+name = "Redirect bunx tsc to just typecheck"
+action = "reject"
+message = "Use `just typecheck` instead of running tsc via bunx. It runs `wxt prepare` first."
+[rule.match]
+command = "bunx"
+arg = "tsc"
+
+[[rule]]
+id = "use-just-build-wxt"
+name = "Redirect wxt to just build/dev"
+action = "reject"
+message = "Use `just build [browser]` or `just dev [browser] [url]` instead of running wxt directly."
+[rule.match]
+command = "wxt"
+
+[[rule]]
+id = "use-just-build-bunx-wxt"
+name = "Redirect bunx wxt to just build/dev"
+action = "reject"
+message = "Use `just build [browser]` or `just dev [browser] [url]` instead of running wxt via bunx."
+[rule.match]
+command = "bunx"
+arg = "wxt"
+
+[[rule]]
+id = "use-just-e2e-playwright"
+name = "Redirect playwright to just test-e2e"
+action = "reject"
+message = "Use `just test-e2e` instead of running playwright directly. It builds Chrome first."
+[rule.match]
+command = "playwright"
+
+[[rule]]
+id = "use-just-e2e-bunx-playwright"
+name = "Redirect bunx playwright to just test-e2e"
+action = "reject"
+message = "Use `just test-e2e` instead of running playwright via bunx. It builds Chrome first."
+[rule.match]
+command = "bunx"
+arg = "playwright"
+
+# --- Block npm/npx/node (use bun/just instead) ---
+
+[[rule]]
+id = "no-npx"
+name = "Block npx"
+action = "reject"
+message = "Don't use npx. Use the corresponding `just` recipe, or `bunx` if no recipe exists."
+[rule.match]
+command = "npx"
+
+[[rule]]
+id = "no-npm"
+name = "Block npm"
+action = "reject"
+message = "Don't use npm. Use `bun` for package management or the corresponding `just` recipe."
+[rule.match]
+command = "npm"
+
+[[rule]]
+id = "no-node"
+name = "Block node"
+action = "reject"
+message = "Don't use node. Use `bun` to run scripts, or `bun -e` for inline scripts."
+[rule.match]
+command = "node"
