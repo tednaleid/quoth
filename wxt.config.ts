@@ -22,6 +22,9 @@ export default defineConfig({
     description: 'YouTube transcript viewer with client-side formatting',
     permissions: ['activeTab', 'tabs', 'storage', 'unlimitedStorage', 'contextMenus'],
     host_permissions: ['*://*.youtube.com/*'],
+    action: {
+      default_title: 'Quoth',
+    },
     side_panel: {
       default_path: 'sidepanel/index.html',
     },
