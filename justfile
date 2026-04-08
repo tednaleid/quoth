@@ -79,6 +79,10 @@ debug-firefox *URL:
 transcript *ARGS:
     bun run tools/transcript.ts {{ARGS}}
 
+# Explore punctuation models interactively on YouTube transcripts
+punct-explore *ARGS:
+    ./tools/punct-explore.py {{ARGS}}
+
 # Run model comparison harness against transcript fixtures
 model-bench *ARGS:
     bun run tools/model-bench/bench.ts {{ARGS}}
