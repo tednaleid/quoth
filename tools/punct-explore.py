@@ -61,7 +61,7 @@ def fetch_transcript(video_id: str) -> dict:
     title = player.get("videoDetails", {}).get("title", video_id)
 
     tracks = player.get("captions", {}).get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
-    en_track = next((t for t in tracks if t["languageCode"] == "en"), None)
+    en_track = next((t for t in tracks if t["languageCode"].startswith("en")), None)
     if not en_track:
         langs = ", ".join(t["languageCode"] for t in tracks) or "none"
         raise ValueError(f"No English captions. Available: {langs}")
@@ -183,12 +183,6 @@ KNOWN_MODELS = {
         "desc": "XLM-RoBERTa large, multilingual. Highest quality, slow/heavy.",
     },
     # --- BERT-based (English) ---
-    "felflare": {
-        "hf_id": "Felflare/bert-restore-punctuation",
-        "size": "~420 MB",
-        "caps": "punct+case",
-        "desc": "BERT base, English. Punctuation + casing.",
-    },
     "kredor": {
         "hf_id": "kredor/punctuate-all",
         "size": "~420 MB",
@@ -210,7 +204,7 @@ KNOWN_MODELS = {
     },
 }
 
-DEFAULT_MODELS = ["oliverguhr-base", "felflare", "unikei"]
+DEFAULT_MODELS = ["oliverguhr-base", "unikei"]
 
 
 def resolve_model_id(name: str) -> str:
@@ -445,7 +439,7 @@ def main():
   just punct-explore list                            # show all known models
   just punct-explore dQw4w9WgXcQ                     # run 3 default models
   just punct-explore XYZ -m oliverguhr-base          # run one model
-  just punct-explore XYZ -m felflare -m unikei       # compare two models
+  just punct-explore XYZ -m kredor -m unikei          # compare two models
   just punct-explore XYZ --all                       # run ALL known models
   just punct-explore XYZ --full                      # show full transcript
   just punct-explore XYZ --gap 3000                  # 3s paragraph gap""",
