@@ -207,33 +207,30 @@ KNOWN_MODELS = {
         "caps": "punct",
         "desc": "DistilBERT, English. Period/comma/question.",
     },
-    # --- RoBERTa (English) ---
+    # --- Gated/private repos (require HF_TOKEN) ---
     "nkjha": {
         "hf_id": "Nkjha/roberta-base-punct-restore",
         "size": "~500 MB",
         "caps": "punct",
-        "desc": "RoBERTa base, English. Punctuation restoration.",
+        "desc": "RoBERTa base, English. [needs HF_TOKEN]",
     },
-    # --- Multilingual BERT ---
     "caribe": {
         "hf_id": "caribe/bert-base-multilingual-cased-punct-restore",
         "size": "~660 MB",
         "caps": "punct+case",
-        "desc": "mBERT cased, multilingual. May preserve casing.",
+        "desc": "mBERT cased, multilingual. [needs HF_TOKEN]",
     },
-    # --- More DistilBERT ---
     "yvonne": {
         "hf_id": "Yvonne-Li/distilbert-base-uncased-finetuned-punct-restore",
         "size": "~250 MB",
         "caps": "punct",
-        "desc": "DistilBERT finetuned for punctuation. Small and fast.",
+        "desc": "DistilBERT, English. [needs HF_TOKEN]",
     },
-    # --- DeBERTa ---
     "xashru": {
         "hf_id": "xashru/deberta-v3-base-punct",
         "size": "~700 MB",
         "caps": "punct",
-        "desc": "DeBERTa v3 base. Newer architecture, potentially better quality.",
+        "desc": "DeBERTa v3 base. [needs HF_TOKEN]",
     },
 }
 
@@ -320,9 +317,10 @@ def load_model(hf_id: str):
     from transformers import pipeline as hf_pipeline
 
     console.print(f"  [dim]Loading {hf_id}...[/dim]", end="")
+    token = os.environ.get("HF_TOKEN")
     load_start = time.time()
     try:
-        classifier = hf_pipeline("token-classification", model=hf_id, aggregation_strategy="none")
+        classifier = hf_pipeline("token-classification", model=hf_id, aggregation_strategy="none", token=token)
     except Exception as e:
         console.print(f" [red]FAILED: {e}[/red]")
         return None, 0
