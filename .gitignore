@@ -12,6 +12,9 @@ node_modules/
 # Bun
 bun.lock
 
+# Model cache (downloaded ONNX models, cached transcripts)
+.cache/
+
 # Playwright
 test-results/
 playwright-report/
