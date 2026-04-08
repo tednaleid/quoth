@@ -445,7 +445,15 @@ def print_streaming_result(
                 output.append("\n")  # blank line between paragraphs
             timestamp = format_time(raw_seg[0]["start_ms"])
             output.append(f"[{timestamp}] ", style="dim")
-        output.append(" ".join(fmt_seg))
+        # Insert paragraph breaks before ">>" speaker change markers
+        first_word = True
+        for word in fmt_seg:
+            if word.startswith(">>"):
+                output.append("\n\n")
+            elif not first_word:
+                output.append(" ")
+            output.append(word)
+            first_word = False
         output.append(" ")
         words_shown += len(fmt_seg)
 
