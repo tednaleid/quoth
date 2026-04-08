@@ -78,6 +78,7 @@
       {autoScroll}
       videoId={state.videoInfo?.videoId ?? ''}
       onSeek={handleSeek}
+      onAutoScrollDisable={() => (autoScroll = false)}
     />
   {:else}
     <div class="placeholder">

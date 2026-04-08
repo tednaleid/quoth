@@ -11,19 +11,38 @@
     autoScroll: boolean;
     videoId: string;
     onSeek: (timeMs: number) => void;
+    onAutoScrollDisable?: () => void;
   }
 
-  let { words, segments, activeWordIndex, activeSegmentIndex, autoScroll, videoId, onSeek }: Props =
-    $props();
+  let {
+    words,
+    segments,
+    activeWordIndex,
+    activeSegmentIndex,
+    autoScroll,
+    videoId,
+    onSeek,
+    onAutoScrollDisable,
+  }: Props = $props();
 
   let segmentEls: (HTMLElement | undefined)[] = $state([]);
+  let programmaticScroll = false;
 
   $effect(() => {
     const el = segmentEls[activeSegmentIndex];
     if (autoScroll && el) {
+      programmaticScroll = true;
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Reset flag after the smooth scroll animation settles
+      setTimeout(() => (programmaticScroll = false), 500);
     }
   });
+
+  function handleUserScroll() {
+    if (!programmaticScroll && autoScroll && onAutoScrollDisable) {
+      onAutoScrollDisable();
+    }
+  }
 
   function timestampUrl(timeMs: number): string {
     const seconds = Math.floor(timeMs / 1000);
@@ -31,7 +50,7 @@
   }
 </script>
 
-<div class="transcript">
+<div class="transcript" onscroll={handleUserScroll}>
   {#each segments as segment, segIdx (segment.startIndex)}
     <p class="segment" class:active={segIdx === activeSegmentIndex} bind:this={segmentEls[segIdx]}>
       <a

@@ -65,4 +65,38 @@ describe('parseJson3Captions', () => {
     expect(words).toHaveLength(1);
     expect(words[0].text).toBe('hello');
   });
+
+  it('strips >> speaker-change markers from word-timed captions', () => {
+    const data = {
+      events: [
+        {
+          tStartMs: 0,
+          dDurationMs: 2000,
+          segs: [
+            { utf8: '>> Yeah,', tOffsetMs: 0 },
+            { utf8: ' okay.', tOffsetMs: 500 },
+          ],
+        },
+      ],
+    };
+    const words = parseJson3Captions(data);
+    expect(words[0].text).toBe('Yeah,');
+    expect(words[1].text).toBe('okay.');
+  });
+
+  it('strips >> speaker-change markers from interpolated captions', () => {
+    const data = {
+      events: [
+        {
+          tStartMs: 0,
+          dDurationMs: 2000,
+          segs: [{ utf8: '>> Hello world' }],
+        },
+      ],
+    };
+    const words = parseJson3Captions(data);
+    expect(words).toHaveLength(2);
+    expect(words[0].text).toBe('Hello');
+    expect(words[1].text).toBe('world');
+  });
 });

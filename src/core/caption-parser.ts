@@ -36,7 +36,8 @@ function parseWordTimedSegments(event: Json3Event): TimedWord[] {
   const segs = event.segs!;
   for (let i = 0; i < segs.length; i++) {
     const seg = segs[i];
-    const text = seg.utf8.trim();
+    // Strip YouTube speaker-change markers (">>" prefix)
+    const text = seg.utf8.replace(/^>>\s*/, '').trim();
     if (!text) continue;
     const start = event.tStartMs + (seg.tOffsetMs ?? 0);
     const nextOffset =
@@ -50,7 +51,7 @@ function parseWordTimedSegments(event: Json3Event): TimedWord[] {
 
 function interpolateSegmentTiming(event: Json3Event): TimedWord[] {
   const fullText = event.segs!.map((s) => s.utf8).join('');
-  const splitWords = fullText.split(/\s+/).filter((w) => w.length > 0);
+  const splitWords = fullText.split(/\s+/).filter((w) => w.length > 0 && w !== '>>');
   if (splitWords.length === 0) return [];
   const wordDuration = event.dDurationMs / splitWords.length;
   return splitWords.map((text, i) => ({

@@ -43,25 +43,54 @@ describe('findActiveWordIndex', () => {
 });
 
 describe('groupWordsIntoSegments', () => {
-  it('groups into 3 segments with gapThresholdMs=2000', () => {
-    const segments = groupWordsIntoSegments(words, 2000);
-    expect(segments).toHaveLength(3);
-    expect(segments[0].startIndex).toBe(0);
-    expect(segments[0].endIndex).toBe(3);
-    expect(segments[1].startIndex).toBe(4);
-    expect(segments[1].endIndex).toBe(6);
-    expect(segments[2].startIndex).toBe(7);
-    expect(segments[2].endIndex).toBe(8);
-  });
-
   it('returns empty array for empty words', () => {
     expect(groupWordsIntoSegments([], 2000)).toEqual([]);
   });
 
-  it('puts all close words in one segment when gap threshold is large', () => {
-    const segments = groupWordsIntoSegments(words, 100000);
+  it('keeps short transcript as a single segment', () => {
+    const segments = groupWordsIntoSegments(words, 2000);
+    // 9 words is below the minimum segment size, so no breaks
     expect(segments).toHaveLength(1);
     expect(segments[0].startIndex).toBe(0);
     expect(segments[0].endIndex).toBe(8);
+  });
+
+  it('breaks at sentence ends when length pressure builds up', () => {
+    // 160 words with uniform timing, sentences every 50 words
+    const longWords: TimedWord[] = Array.from({ length: 160 }, (_, i) => {
+      const text = i > 0 && (i + 1) % 50 === 0 ? `end.` : `word${i}`;
+      return { text, start: i * 200, end: (i + 1) * 200, original: text };
+    });
+    const segments = groupWordsIntoSegments(longWords, 2000);
+    // Should break at sentence boundaries as length pressure increases
+    expect(segments.length).toBeGreaterThan(1);
+    // Every segment boundary should be at a sentence end
+    for (let i = 0; i < segments.length - 1; i++) {
+      expect(longWords[segments[i].endIndex].text).toMatch(/[.!?]$/);
+    }
+  });
+
+  it('breaks at large gaps with sentence ends even in shorter segments', () => {
+    // 60 words: first 30 tightly packed, then a big pause, then 30 more
+    const gapWords: TimedWord[] = Array.from({ length: 60 }, (_, i) => {
+      const text = i === 29 ? 'pause.' : `w${i}`;
+      // First 30 words: 100ms apart. Then a 5000ms gap. Then 100ms apart again.
+      const start = i <= 29 ? i * 100 : 29 * 100 + 5000 + (i - 30) * 100;
+      return { text, start, end: start + 100, original: text };
+    });
+    const segments = groupWordsIntoSegments(gapWords, 2000);
+    // The 5000ms gap + sentence end should trigger a break
+    expect(segments.length).toBeGreaterThan(1);
+    expect(segments[0].endIndex).toBe(29);
+  });
+
+  it('does not split short segments even if they have sentence endings', () => {
+    const shortWords: TimedWord[] = [
+      { text: 'Hello.', start: 0, end: 100, original: 'Hello.' },
+      { text: 'World.', start: 100, end: 200, original: 'World.' },
+      { text: 'Done.', start: 200, end: 300, original: 'Done.' },
+    ];
+    const segments = groupWordsIntoSegments(shortWords, 2000);
+    expect(segments).toHaveLength(1);
   });
 });

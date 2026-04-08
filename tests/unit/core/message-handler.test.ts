@@ -72,7 +72,7 @@ describe('handleMessage', () => {
       expect(next.segments.length).toBeGreaterThan(0);
     });
 
-    it('groups words into segments with a 2000ms gap threshold', () => {
+    it('groups short word list into a single segment', () => {
       const state = createInitialState();
       const message: ContentMessage = {
         type: 'captions-loaded',
@@ -80,12 +80,10 @@ describe('handleMessage', () => {
         words,
       };
       const next = handleMessage(state, message);
-      // words has a gap of 3000ms between index 1 (end 2000) and index 2 (start 5000)
-      expect(next.segments).toHaveLength(2);
+      // 4 words is too few to split into multiple segments
+      expect(next.segments).toHaveLength(1);
       expect(next.segments[0].startIndex).toBe(0);
-      expect(next.segments[0].endIndex).toBe(1);
-      expect(next.segments[1].startIndex).toBe(2);
-      expect(next.segments[1].endIndex).toBe(3);
+      expect(next.segments[0].endIndex).toBe(3);
     });
 
     it('sets segments to empty when words is empty', () => {
