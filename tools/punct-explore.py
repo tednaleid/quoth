@@ -208,31 +208,6 @@ KNOWN_MODELS = {
         "caps": "punct",
         "desc": "DistilBERT, English. Period/comma/question.",
     },
-    # --- Gated/private repos (require HF_TOKEN) ---
-    "nkjha": {
-        "hf_id": "Nkjha/roberta-base-punct-restore",
-        "size": "~500 MB",
-        "caps": "punct",
-        "desc": "RoBERTa base, English. [needs HF_TOKEN]",
-    },
-    "caribe": {
-        "hf_id": "caribe/bert-base-multilingual-cased-punct-restore",
-        "size": "~660 MB",
-        "caps": "punct+case",
-        "desc": "mBERT cased, multilingual. [needs HF_TOKEN]",
-    },
-    "yvonne": {
-        "hf_id": "Yvonne-Li/distilbert-base-uncased-finetuned-punct-restore",
-        "size": "~250 MB",
-        "caps": "punct",
-        "desc": "DistilBERT, English. [needs HF_TOKEN]",
-    },
-    "xashru": {
-        "hf_id": "xashru/deberta-v3-base-punct",
-        "size": "~700 MB",
-        "caps": "punct",
-        "desc": "DeBERTa v3 base. [needs HF_TOKEN]",
-    },
 }
 
 DEFAULT_MODELS = ["oliverguhr-base", "felflare", "unikei"]
