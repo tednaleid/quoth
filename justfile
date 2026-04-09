@@ -91,10 +91,37 @@ model-bench *ARGS:
 fixture-capture URL *NAME:
     bun run tools/fixture-capture.ts "{{URL}}" {{NAME}}
 
-# Bump version, generate release notes, tag, and push (Phase 6+)
-bump VERSION:
-    @echo "Bump not yet implemented (Phase 6)"
+# Build, sign, and install the Firefox extension (requires WEB_EXT_API_KEY and WEB_EXT_API_SECRET)
+install-firefox:
+    just build firefox
+    bunx web-ext sign --source-dir .output/firefox-mv2 --artifacts-dir .output --channel unlisted
+    @echo "Opening signed .xpi in Firefox..."
+    @open .output/*.xpi
 
-# Re-trigger release workflow for existing version (Phase 6+)
-retag VERSION:
-    @echo "Retag not yet implemented (Phase 6)"
+# Zip both browsers for release
+zip:
+    bunx wxt zip
+    bunx wxt zip -b firefox
+
+# Push AMO credentials from local env to GitHub repository secrets
+setup-github-secrets:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${WEB_EXT_API_KEY:-}" ] || [ -z "${WEB_EXT_API_SECRET:-}" ]; then
+        echo "Error: WEB_EXT_API_KEY and WEB_EXT_API_SECRET must be set in your environment"
+        exit 1
+    fi
+    gh secret set WEB_EXT_API_KEY --body "$WEB_EXT_API_KEY"
+    gh secret set WEB_EXT_API_SECRET --body "$WEB_EXT_API_SECRET"
+    echo "GitHub secrets set successfully."
+
+# Tag a release: bumps package.json version, commits, tags, and pushes
+release VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Update version in package.json
+    bun -e "const pkg = require('./package.json'); pkg.version = '{{VERSION}}'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')"
+    git add package.json
+    git commit -m "Release v{{VERSION}}"
+    git tag "v{{VERSION}}"
+    git push && git push --tags

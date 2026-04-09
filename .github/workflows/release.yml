@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run all checks
+        run: just check
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: xvfb-run just test-e2e
+
+      - name: Build and zip Chrome extension
+        run: bunx wxt zip
+
+      - name: Build and zip Firefox extension
+        run: bunx wxt zip -b firefox
+
+      - name: Sign Firefox extension
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.WEB_EXT_API_KEY }}
+          WEB_EXT_API_SECRET: ${{ secrets.WEB_EXT_API_SECRET }}
+        run: bunx web-ext sign --source-dir .output/firefox-mv2 --artifacts-dir .output/signed --channel unlisted
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Quoth $VERSION" \
+            --generate-notes \
+            .output/*-mv3.zip \
+            .output/*-mv2.zip \
+            .output/signed/*.xpi
