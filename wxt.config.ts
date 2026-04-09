@@ -29,10 +29,12 @@ export default defineConfig({
       default_path: 'sidepanel/index.html',
     },
     browser_specific_settings: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       gecko: {
         id: 'quoth@tednaleid.com',
         strict_min_version: '109.0',
-      },
+        data_collection_permissions: { required: ['none'] },
+      } as any,
     },
   },
 });
