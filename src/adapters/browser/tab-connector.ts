@@ -33,17 +33,31 @@ function notifyConnect(tabId: number, callbacks: TabConnectorCallbacks): void {
 export const setupTabConnector: TabConnector = async (callbacks: TabConnectorCallbacks) => {
   let connectedTabId: number | null = null;
 
+  function connectIfYouTube(tab: Browser.tabs.Tab): void {
+    if (isYouTubeTab(tab) && tab.id !== undefined && tab.id !== connectedTabId) {
+      connectedTabId = tab.id;
+      notifyConnect(tab.id, callbacks);
+    }
+  }
+
   const onActivated = async (activeInfo: { tabId: number; windowId: number }) => {
     const tab = await browser.tabs.get(activeInfo.tabId);
-    if (isYouTubeTab(tab) && tab.id !== undefined) {
-      if (tab.id !== connectedTabId) {
-        connectedTabId = tab.id;
-        notifyConnect(tab.id, callbacks);
-      }
+    connectIfYouTube(tab);
+  };
+
+  // Fires when a tab's URL changes (navigation within an existing tab)
+  const onUpdated = (
+    _tabId: number,
+    changeInfo: { url?: string; status?: string },
+    tab: Browser.tabs.Tab,
+  ) => {
+    if (changeInfo.url || changeInfo.status === 'complete') {
+      connectIfYouTube(tab);
     }
   };
 
   browser.tabs.onActivated.addListener(onActivated);
+  browser.tabs.onUpdated.addListener(onUpdated);
 
   // Prefer the active YouTube tab; fall back to any YouTube tab
   const activeTabId = await findActiveYouTubeTab();
@@ -60,5 +74,6 @@ export const setupTabConnector: TabConnector = async (callbacks: TabConnectorCal
 
   return () => {
     browser.tabs.onActivated.removeListener(onActivated);
+    browser.tabs.onUpdated.removeListener(onUpdated);
   };
 };

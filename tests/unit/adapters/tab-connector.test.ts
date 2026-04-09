@@ -154,6 +154,58 @@ describe('setupTabConnector - tab switching', () => {
   });
 });
 
+describe('setupTabConnector - tab navigation (onUpdated)', () => {
+  it('calls onConnect when an existing tab navigates to YouTube', async () => {
+    // Start with a non-YouTube tab
+    const tab = await fakeBrowser.tabs.create({
+      id: 1,
+      url: 'https://www.example.com/',
+    });
+
+    const onConnect = vi.fn();
+    const cleanup = await setupTabConnector({ onConnect });
+
+    // Initial connect should not fire (no YouTube tabs)
+    expect(onConnect).not.toHaveBeenCalled();
+
+    // Navigate the existing tab to YouTube -- fires onUpdated, not onActivated
+    const updatedTab = { ...tab, url: 'https://www.youtube.com/watch?v=abc' };
+    await fakeBrowser.tabs.onUpdated.trigger(
+      1,
+      { url: 'https://www.youtube.com/watch?v=abc' },
+      updatedTab,
+    );
+
+    expect(onConnect).toHaveBeenCalledOnce();
+    expect(onConnect).toHaveBeenCalledWith(1);
+
+    cleanup();
+  });
+
+  it('does not call onConnect when a tab navigates away from YouTube', async () => {
+    await fakeBrowser.tabs.create({
+      id: 1,
+      url: 'https://www.youtube.com/watch?v=abc',
+    });
+
+    const onConnect = vi.fn();
+    const cleanup = await setupTabConnector({ onConnect });
+
+    expect(onConnect).toHaveBeenCalledOnce();
+    onConnect.mockClear();
+
+    // Navigate away from YouTube
+    await fakeBrowser.tabs.onUpdated.trigger(1, { url: 'https://www.example.com/' }, {
+      id: 1,
+      url: 'https://www.example.com/',
+    } as Browser.tabs.Tab);
+
+    expect(onConnect).not.toHaveBeenCalled();
+
+    cleanup();
+  });
+});
+
 describe('setupTabConnector - cleanup', () => {
   it('stops listening for tab activation after cleanup', async () => {
     await fakeBrowser.tabs.create({
