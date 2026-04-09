@@ -98,6 +98,18 @@ install-firefox:
     @echo "Opening signed .xpi in Firefox..."
     @open .output/*.xpi
 
+# Download the signed .xpi from the latest GitHub release and open it in Firefox to install
+install-release:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tag=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+    echo "Installing $tag..."
+    dir=$(mktemp -d)
+    gh release download "$tag" --pattern '*.xpi' --dir "$dir"
+    xpi=$(ls "$dir"/*.xpi)
+    echo "Opening $xpi in Firefox..."
+    open -a Firefox "$xpi"
+
 # Zip both browsers for release
 zip:
     bunx wxt zip
