@@ -101,7 +101,7 @@
       sans-serif;
     color: #e0e0e0;
     background: #1a1a2e;
-    font-size: 14px;
+    font-size: 16px;
   }
 
   main.disconnected {

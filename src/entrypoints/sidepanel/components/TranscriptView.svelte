@@ -80,16 +80,16 @@
       {@const chapter = chapterMap[segIdx]}
       <h3 class="chapter-title">
         <a
-          class="chapter-timestamp"
+          class="chapter-link"
           href={timestampUrl(chapter.startTimeMs)}
           onclick={(e) => {
             e.preventDefault();
             onSeek(chapter.startTimeMs);
           }}
         >
-          {formatTime(chapter.startTimeMs)}
+          <span class="chapter-timestamp">{formatTime(chapter.startTimeMs)}</span>
+          {chapter.title}
         </a>
-        {chapter.title}
       </h3>
     {/if}
     <p class="segment" class:active={segIdx === activeSegmentIndex} bind:this={segmentEls[segIdx]}>
@@ -128,27 +128,31 @@
   }
 
   .chapter-title {
-    margin: 20px 0 8px 0;
+    margin: 24px 0 8px 0;
     padding: 0 6px;
-    font-size: 15px;
+    font-size: 24px;
     font-weight: 600;
-    color: #c0c8e0;
+    line-height: 1.3;
   }
 
   .chapter-title:first-child {
     margin-top: 0;
   }
 
+  .chapter-link {
+    color: #c0c8e0;
+    text-decoration: none;
+  }
+
+  .chapter-link:hover {
+    color: #e0e8ff;
+  }
+
   .chapter-timestamp {
+    display: block;
     font-size: 11px;
     font-weight: 400;
     color: #556;
-    text-decoration: none;
-    margin-right: 6px;
-  }
-
-  .chapter-timestamp:hover {
-    color: #88a;
   }
 
   .segment {
