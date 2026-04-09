@@ -17,6 +17,11 @@ export interface VideoInfo {
   durationMs: number;
 }
 
+export interface Chapter {
+  title: string;
+  startTimeMs: number;
+}
+
 export interface CaptionTrack {
   languageCode: string;
   languageName: string;

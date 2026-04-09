@@ -1,11 +1,12 @@
 <script lang="ts">
-  import type { TimedWord } from '../../../core/types';
+  import type { TimedWord, Chapter } from '../../../core/types';
   import type { WordSegment } from '../../../core/playback-sync';
   import { formatTime } from '../../../core/time-format';
 
   interface Props {
     words: TimedWord[];
     segments: WordSegment[];
+    chapters: Chapter[];
     activeWordIndex: number;
     activeSegmentIndex: number;
     autoScroll: boolean;
@@ -17,6 +18,7 @@
   let {
     words,
     segments,
+    chapters,
     activeWordIndex,
     activeSegmentIndex,
     autoScroll,
@@ -24,6 +26,28 @@
     onSeek,
     onAutoScrollDisable,
   }: Props = $props();
+
+  // Map segment index -> chapter that starts at or just before this segment.
+  // Uses a plain object instead of Map to avoid Svelte reactivity lint warning.
+  let chapterMap: Record<number, Chapter> = $derived.by(() => {
+    const map: Record<number, Chapter> = {};
+    if (chapters.length === 0 || segments.length === 0) return map;
+    const assigned: Record<number, boolean> = {};
+    let chapterIdx = 0;
+    for (let segIdx = 0; segIdx < segments.length; segIdx++) {
+      while (
+        chapterIdx + 1 < chapters.length &&
+        chapters[chapterIdx + 1].startTimeMs <= segments[segIdx].startTime
+      ) {
+        chapterIdx++;
+      }
+      if (chapters[chapterIdx].startTimeMs <= segments[segIdx].startTime && !assigned[chapterIdx]) {
+        map[segIdx] = chapters[chapterIdx];
+        assigned[chapterIdx] = true;
+      }
+    }
+    return map;
+  });
 
   let segmentEls: (HTMLElement | undefined)[] = $state([]);
   let programmaticScroll = false;
@@ -52,6 +76,22 @@
 
 <div class="transcript" onscroll={handleUserScroll}>
   {#each segments as segment, segIdx (segment.startIndex)}
+    {#if chapterMap[segIdx]}
+      {@const chapter = chapterMap[segIdx]}
+      <h3 class="chapter-title">
+        <a
+          class="chapter-timestamp"
+          href={timestampUrl(chapter.startTimeMs)}
+          onclick={(e) => {
+            e.preventDefault();
+            onSeek(chapter.startTimeMs);
+          }}
+        >
+          {formatTime(chapter.startTimeMs)}
+        </a>
+        {chapter.title}
+      </h3>
+    {/if}
     <p class="segment" class:active={segIdx === activeSegmentIndex} bind:this={segmentEls[segIdx]}>
       <a
         class="timestamp"
@@ -87,6 +127,30 @@
     padding: 8px 12px;
   }
 
+  .chapter-title {
+    margin: 20px 0 8px 0;
+    padding: 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #c0c8e0;
+  }
+
+  .chapter-title:first-child {
+    margin-top: 0;
+  }
+
+  .chapter-timestamp {
+    font-size: 11px;
+    font-weight: 400;
+    color: #556;
+    text-decoration: none;
+    margin-right: 6px;
+  }
+
+  .chapter-timestamp:hover {
+    color: #88a;
+  }
+
   .segment {
     margin: 0 0 12px 0;
     line-height: 1.6;
@@ -101,7 +165,7 @@
 
   .timestamp {
     display: block;
-    font-size: 10px;
+    font-size: 11px;
     color: #556;
     margin-bottom: 2px;
     text-decoration: none;

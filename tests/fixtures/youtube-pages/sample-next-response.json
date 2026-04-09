@@ -1,0 +1,113 @@
+{
+  "responseContext": {},
+  "contents": {
+    "singleColumnWatchNextResults": {
+      "results": {
+        "results": {
+          "contents": [
+            {
+              "itemSectionRenderer": {
+                "contents": [
+                  {
+                    "engagementPanelSectionListRenderer": {
+                      "content": {
+                        "macroMarkersList": {
+                          "contents": [
+                            {
+                              "macroMarkersListItemModel": {
+                                "renderer": {
+                                  "title": {
+                                    "elementsAttributedString": {
+                                      "content": "Intro"
+                                    }
+                                  },
+                                  "timeDescription": {
+                                    "elementsAttributedString": {
+                                      "content": "0:00"
+                                    }
+                                  },
+                                  "onTap": {
+                                    "commandExecutorCommand": {
+                                      "commands": [
+                                        {
+                                          "watchEndpoint": {
+                                            "videoId": "test123",
+                                            "startTimeSeconds": 0
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "macroMarkersListItemModel": {
+                                "renderer": {
+                                  "title": {
+                                    "elementsAttributedString": {
+                                      "content": "Main Topic"
+                                    }
+                                  },
+                                  "timeDescription": {
+                                    "elementsAttributedString": {
+                                      "content": "1:30"
+                                    }
+                                  },
+                                  "onTap": {
+                                    "commandExecutorCommand": {
+                                      "commands": [
+                                        {
+                                          "watchEndpoint": {
+                                            "videoId": "test123",
+                                            "startTimeSeconds": 90
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "macroMarkersListItemModel": {
+                                "renderer": {
+                                  "title": {
+                                    "elementsAttributedString": {
+                                      "content": "Conclusion"
+                                    }
+                                  },
+                                  "timeDescription": {
+                                    "elementsAttributedString": {
+                                      "content": "5:00"
+                                    }
+                                  },
+                                  "onTap": {
+                                    "commandExecutorCommand": {
+                                      "commands": [
+                                        {
+                                          "watchEndpoint": {
+                                            "videoId": "test123",
+                                            "startTimeSeconds": 300
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

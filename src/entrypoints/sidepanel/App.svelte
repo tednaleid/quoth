@@ -71,6 +71,7 @@
       segments={state.segments}
       activeWordIndex={state.activeWordIndex}
       activeSegmentIndex={state.activeSegmentIndex}
+      chapters={state.chapters}
       {autoScroll}
       videoId={state.videoInfo?.videoId ?? ''}
       onSeek={handleSeek}
@@ -96,7 +97,7 @@
       sans-serif;
     color: #e0e0e0;
     background: #1a1a2e;
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .placeholder {

@@ -3,13 +3,13 @@
  * ABOUTME: All inter-context communication uses these typed messages.
  */
 
-import type { TimedWord, VideoInfo, CaptionTrack } from './core/types';
+import type { TimedWord, VideoInfo, CaptionTrack, Chapter } from './core/types';
 
 // Content script -> Side panel (via background)
 export type ContentMessage =
   | { type: 'video-detected'; videoId: string; videoInfo: VideoInfo; captionTracks: CaptionTrack[] }
   | { type: 'video-left' }
-  | { type: 'captions-loaded'; videoId: string; words: TimedWord[] }
+  | { type: 'captions-loaded'; videoId: string; words: TimedWord[]; chapters?: Chapter[] }
   | { type: 'captions-error'; videoId: string; error: string }
   | { type: 'time-update'; currentTimeMs: number; isPlaying: boolean };
 

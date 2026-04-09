@@ -3,7 +3,7 @@
  * ABOUTME: No browser APIs -- maps messages to TranscriptState transitions.
  */
 
-import type { TimedWord, VideoInfo } from './types';
+import type { TimedWord, VideoInfo, Chapter } from './types';
 import type { WordSegment } from './playback-sync';
 import {
   findActiveWordIndex,
@@ -18,6 +18,7 @@ export interface TranscriptState {
   videoInfo: VideoInfo | null;
   words: TimedWord[];
   segments: WordSegment[];
+  chapters: Chapter[];
   activeWordIndex: number;
   activeSegmentIndex: number;
   status: string;
@@ -28,6 +29,7 @@ export function createInitialState(): TranscriptState {
     videoInfo: null,
     words: [],
     segments: [],
+    chapters: [],
     activeWordIndex: -1,
     activeSegmentIndex: -1,
     status: 'Open a YouTube video to see its transcript.',
@@ -42,7 +44,8 @@ export function handleMessage(state: TranscriptState, message: ContentMessage): 
     case 'captions-loaded': {
       const words = message.words;
       const segments = groupWordsIntoSegments(words, SEGMENT_GAP_MS);
-      return { ...state, words, segments, status: `${words.length} words loaded` };
+      const chapters = message.chapters ?? [];
+      return { ...state, words, segments, chapters, status: `${words.length} words loaded` };
     }
 
     case 'captions-error':

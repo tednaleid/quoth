@@ -133,6 +133,7 @@ describe('handleMessage', () => {
         videoInfo,
         words,
         segments: [{ startIndex: 0, endIndex: 3, startTime: 1000, endTime: 6000 }],
+        chapters: [],
         activeWordIndex: 2,
         activeSegmentIndex: 0,
         status: '4 words loaded',

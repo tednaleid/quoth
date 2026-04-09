@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { extractVideoInfo, extractCaptionTracks } from '../../../src/adapters/youtube/innertube';
+import {
+  extractVideoInfo,
+  extractCaptionTracks,
+  extractChapters,
+} from '../../../src/adapters/youtube/innertube';
 import fixture from '../../fixtures/youtube-pages/sample-player-response.json';
+import nextFixture from '../../fixtures/youtube-pages/sample-next-response.json';
 
 describe('extractVideoInfo', () => {
   it('should extract video info from player response', () => {
@@ -56,5 +61,24 @@ describe('extractCaptionTracks', () => {
     const tracks = extractCaptionTracks(response);
     expect(tracks[0].baseUrl).toContain('fmt=json3');
     expect(tracks[0].baseUrl).not.toContain('fmt=srv3');
+  });
+});
+
+describe('extractChapters', () => {
+  it('extracts chapters from /next response', () => {
+    const chapters = extractChapters(nextFixture);
+    expect(chapters).toHaveLength(3);
+    expect(chapters[0]).toEqual({ title: 'Intro', startTimeMs: 0 });
+    expect(chapters[1]).toEqual({ title: 'Main Topic', startTimeMs: 90000 });
+    expect(chapters[2]).toEqual({ title: 'Conclusion', startTimeMs: 300000 });
+  });
+
+  it('returns empty array when no chapters exist', () => {
+    expect(extractChapters({})).toEqual([]);
+  });
+
+  it('returns empty array for null/undefined input', () => {
+    expect(extractChapters(null)).toEqual([]);
+    expect(extractChapters(undefined)).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@
  * ABOUTME: Used by the content script to parse responses from the Innertube ANDROID API.
  */
 
-import type { VideoInfo, CaptionTrack } from '../../core/types';
+import type { VideoInfo, CaptionTrack, Chapter } from '../../core/types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -17,6 +17,33 @@ export function extractVideoInfo(playerResponse: any): VideoInfo | null {
     channelName: details.author ?? '',
     durationMs: parseInt(details.lengthSeconds, 10) * 1000,
   };
+}
+
+/** Recursively collect all values for a given key at any depth. */
+function findAllByKey(obj: any, targetKey: string): any[] {
+  const results: any[] = [];
+  if (obj == null || typeof obj !== 'object') return results;
+  for (const key of Object.keys(obj)) {
+    if (key === targetKey) results.push(obj[key]);
+    results.push(...findAllByKey(obj[key], targetKey));
+  }
+  return results;
+}
+
+export function extractChapters(nextResponse: any): Chapter[] {
+  const markers = findAllByKey(nextResponse, 'macroMarkersListItemModel');
+  const chapters: Chapter[] = [];
+  for (const marker of markers) {
+    const renderer = marker?.renderer;
+    if (!renderer) continue;
+    const title = renderer.title?.elementsAttributedString?.content;
+    const startSeconds =
+      renderer.onTap?.commandExecutorCommand?.commands?.[0]?.watchEndpoint?.startTimeSeconds;
+    if (title != null && startSeconds != null) {
+      chapters.push({ title, startTimeMs: startSeconds * 1000 });
+    }
+  }
+  return chapters.sort((a, b) => a.startTimeMs - b.startTimeMs);
 }
 
 export function extractCaptionTracks(playerResponse: any): CaptionTrack[] {

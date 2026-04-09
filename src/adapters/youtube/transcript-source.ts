@@ -3,11 +3,12 @@
  * ABOUTME: Implements the TranscriptSource port using dependency-injected fetch for testability.
  */
 import type { TranscriptSource, VideoMetadata } from '../../ports/transcript-source';
-import type { CaptionTrack, TimedWord } from '../../core/types';
-import { extractVideoInfo, extractCaptionTracks } from './innertube';
+import type { CaptionTrack, Chapter, TimedWord } from '../../core/types';
+import { extractVideoInfo, extractCaptionTracks, extractChapters } from './innertube';
 import { parseJson3Captions } from '../../core/caption-parser';
 
-const INNERTUBE_URL = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
+const INNERTUBE_PLAYER_URL = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
+const INNERTUBE_NEXT_URL = 'https://www.youtube.com/youtubei/v1/next?prettyPrint=false';
 const ANDROID_CONTEXT = {
   client: {
     clientName: 'ANDROID',
@@ -26,8 +27,8 @@ export class YouTubeTranscriptSource implements TranscriptSource {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async fetchPlayerResponse(videoId: string): Promise<any> {
-    const response = await this.fetchFn(INNERTUBE_URL, {
+  private async fetchInnertubeApi(url: string, videoId: string): Promise<any> {
+    const response = await this.fetchFn(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -43,7 +44,7 @@ export class YouTubeTranscriptSource implements TranscriptSource {
   }
 
   async getVideoMetadata(videoId: string): Promise<VideoMetadata> {
-    const playerResponse = await this.fetchPlayerResponse(videoId);
+    const playerResponse = await this.fetchInnertubeApi(INNERTUBE_PLAYER_URL, videoId);
     if (!playerResponse) return { videoInfo: null, captionTracks: [] };
     return {
       videoInfo: extractVideoInfo(playerResponse),
@@ -56,5 +57,11 @@ export class YouTubeTranscriptSource implements TranscriptSource {
     if (!response.ok) return [];
     const json3 = await response.json();
     return parseJson3Captions(json3);
+  }
+
+  async fetchChapters(videoId: string): Promise<Chapter[]> {
+    const nextResponse = await this.fetchInnertubeApi(INNERTUBE_NEXT_URL, videoId);
+    if (!nextResponse) return [];
+    return extractChapters(nextResponse);
   }
 }

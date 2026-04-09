@@ -50,7 +50,7 @@
   }
   h1 {
     margin: 0;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;

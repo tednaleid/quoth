@@ -12,7 +12,7 @@
 <style>
   .status-bar {
     padding: 4px 12px;
-    font-size: 11px;
+    font-size: 12px;
     color: #666;
     border-top: 1px solid #2a2a4a;
     flex-shrink: 0;
