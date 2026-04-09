@@ -91,16 +91,27 @@ Version lives in `package.json` and is propagated to manifests
 automatically by WXT. To release:
 
 ```bash
-just release 0.1.0
+just bump 0.1.0       # specific version
+just bump              # patch increment (0.0.0 -> 0.0.1)
 ```
 
-This bumps `package.json`, commits, tags, and pushes. CI takes over from
-there.
+This bumps `package.json`, commits, generates release notes (via Claude
+if available, git log fallback), creates an annotated tag, and pushes.
+The release CI workflow triggers on the tag.
+
+To re-trigger a failed release without changing the version:
+
+```bash
+just retag 0.1.0
+```
+
+This preserves the existing tag annotation (release notes), deletes the
+GitHub release and remote tag, then recreates and pushes.
 
 ## File Locations
 
 - `.github/workflows/ci.yml` -- test and lint checks
 - `.github/workflows/release.yml` -- build, sign, publish
-- `justfile` -- `install-firefox`, `release` recipes
+- `justfile` -- `install-firefox`, `bump`, `retag` recipes
 - `wxt.config.ts` -- manifest config, AMO gecko ID
 - `package.json` -- version source of truth

@@ -115,13 +115,59 @@ setup-github-secrets:
     gh secret set WEB_EXT_API_SECRET --body "$WEB_EXT_API_SECRET"
     echo "GitHub secrets set successfully."
 
-# Tag a release: bumps package.json version, commits, tags, and pushes
-release VERSION:
+# Bump version, commit, tag with release notes, and push.
+# Usage: just bump 0.1.0 (or just bump for patch increment)
+bump version="":
     #!/usr/bin/env bash
     set -euo pipefail
-    # Update version in package.json
-    bun -e "const pkg = require('./package.json'); pkg.version = '{{VERSION}}'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')"
-    git add package.json
-    git commit -m "Release v{{VERSION}}"
-    git tag "v{{VERSION}}"
+    current=$(jq -r .version package.json)
+    if [ -z "{{version}}" ]; then
+        IFS='.' read -r major minor patch <<< "$current"
+        new="$major.$minor.$((patch + 1))"
+    else
+        new="{{version}}"
+    fi
+    echo "Bumping $current -> $new"
+    if [ "$current" != "$new" ]; then
+        jq --arg v "$new" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
+        git add package.json
+        git commit -m "Bump version to $new"
+    fi
+    # Generate release notes from commits since last tag
+    prev_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+    if [ -n "$prev_tag" ]; then
+        log=$(git log "$prev_tag"..HEAD --oneline --no-merges)
+    else
+        log=$(git log --oneline --no-merges)
+    fi
+    notes_file=$(mktemp)
+    trap 'rm -f "$notes_file"' EXIT
+    if command -v claude >/dev/null 2>&1; then
+        claude -p "Generate concise release notes for version $new. Commits:\n$log\n\nGuidelines: group related commits, focus on user-facing changes, skip version bumps and CI changes, one line per bullet, past tense, output only a bullet list." > "$notes_file" 2>/dev/null || echo "$log" | sed 's/^[0-9a-f]* /- /' > "$notes_file"
+    else
+        echo "$log" | sed 's/^[0-9a-f]* /- /' > "$notes_file"
+    fi
+    echo "Release notes:"
+    cat "$notes_file"
+    git tag -a "v$new" -F "$notes_file"
+    rm -f "$notes_file"
+    git push && git push --tags
+    echo "v$new released!"
+
+# Delete a GitHub release and re-tag to re-trigger release workflow.
+# Preserves the annotated tag message (release notes).
+# Usage: just retag 0.1.0
+retag version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tag="v{{version}}"
+    # Save existing tag annotation before deleting
+    notes=$(git tag -l --format='%(contents)' "$tag" 2>/dev/null || echo "$tag")
+    notes_file=$(mktemp)
+    trap 'rm -f "$notes_file"' EXIT
+    echo "$notes" > "$notes_file"
+    gh release delete "$tag" --yes || true
+    git push origin ":refs/tags/$tag" || true
+    git tag -d "$tag" || true
+    git tag -a "$tag" -F "$notes_file"
     git push && git push --tags

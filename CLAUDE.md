@@ -18,6 +18,9 @@ YouTube transcript viewer browser extension with client-side ML formatting.
 - `just clean` -- remove build artifacts, caches, and dev browser profiles
 - `just clean-profiles` -- clear just the dev browser profiles (cookies/consent)
 - `just install-hooks` -- install pre-commit hook that runs `just check`
+- `just install-firefox` -- build, sign, and install Firefox extension locally
+- `just bump [version]` -- bump version, generate release notes, tag, and push (triggers release CI)
+- `just retag <version>` -- re-trigger release workflow for an existing version
 
 Red/green testing: write a failing test before implementing, then make it pass.
 All commits should pass `just check`. After refactoring browser integration

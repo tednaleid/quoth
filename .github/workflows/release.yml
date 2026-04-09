@@ -4,13 +4,17 @@ on:
   push:
     tags: ['v*']
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -22,15 +26,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Run all checks
-        run: just check
-
-      - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
-
-      - name: Run E2E tests
-        run: xvfb-run just test-e2e
 
       - name: Build and zip Chrome extension
         run: bunx wxt zip
@@ -44,14 +39,16 @@ jobs:
           WEB_EXT_API_SECRET: ${{ secrets.WEB_EXT_API_SECRET }}
         run: bunx web-ext sign --source-dir .output/firefox-mv2 --artifacts-dir .output/signed --channel unlisted
 
+      - name: Ensure annotated tag is available
+        run: git fetch origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}" --force
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" \
-            --title "Quoth $VERSION" \
-            --generate-notes \
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-from-tag \
             .output/*-mv3.zip \
             .output/*-mv2.zip \
             .output/signed/*.xpi
