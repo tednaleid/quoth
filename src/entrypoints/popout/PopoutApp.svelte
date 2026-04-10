@@ -73,7 +73,6 @@
       state = {
         ...state,
         currentTimeMs: 0,
-        activeSegmentIndex: -1,
         status: reason === 'tab-closed' ? 'YouTube tab closed' : 'Video navigated away',
       };
     },
@@ -106,7 +105,6 @@
       words={state.words}
       segments={state.segments}
       currentTimeMs={state.currentTimeMs}
-      activeSegmentIndex={state.activeSegmentIndex}
       chapters={state.chapters}
       {autoScroll}
       videoId={state.videoInfo?.videoId ?? ''}

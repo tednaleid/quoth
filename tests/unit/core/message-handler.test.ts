@@ -25,7 +25,6 @@ describe('createInitialState', () => {
     expect(state.words).toEqual([]);
     expect(state.segments).toEqual([]);
     expect(state.currentTimeMs).toBe(0);
-    expect(state.activeSegmentIndex).toBe(-1);
     expect(state.status).toBe('Open a YouTube video to see its transcript.');
   });
 });
@@ -135,7 +134,6 @@ describe('handleMessage', () => {
         segments: [{ startIndex: 0, endIndex: 3, startTime: 1000, endTime: 6000 }],
         chapters: [],
         currentTimeMs: 5000,
-        activeSegmentIndex: 0,
         status: '4 words loaded',
       };
       const message: ContentMessage = { type: 'video-left' };
@@ -144,13 +142,12 @@ describe('handleMessage', () => {
       expect(next.words).toEqual([]);
       expect(next.segments).toEqual([]);
       expect(next.currentTimeMs).toBe(0);
-      expect(next.activeSegmentIndex).toBe(-1);
       expect(next.status).toBe('Open a YouTube video to see its transcript.');
     });
   });
 
   describe('time-update', () => {
-    it('updates currentTimeMs and activeSegmentIndex when words are loaded', () => {
+    it('updates currentTimeMs when words are loaded', () => {
       const captionsLoadedState = handleMessage(createInitialState(), {
         type: 'captions-loaded',
         videoId: 'abc123',
@@ -163,7 +160,6 @@ describe('handleMessage', () => {
       };
       const next = handleMessage(captionsLoadedState, message);
       expect(next.currentTimeMs).toBe(1600);
-      expect(next.activeSegmentIndex).toBe(0);
     });
 
     it('does not change state when words array is empty', () => {
@@ -175,7 +171,6 @@ describe('handleMessage', () => {
       };
       const next = handleMessage(state, message);
       expect(next.currentTimeMs).toBe(0);
-      expect(next.activeSegmentIndex).toBe(-1);
     });
 
     it('does not change words or segments', () => {
