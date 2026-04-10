@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { findActiveWordIndex, groupWordsIntoSegments } from '../../../src/core/playback-sync';
+import {
+  findActiveWordIndex,
+  findHorizonWindow,
+  groupWordsIntoSegments,
+  horizonIntensity,
+} from '../../../src/core/playback-sync';
 import type { TimedWord } from '../../../src/core/types';
 
 const words: TimedWord[] = [
@@ -92,5 +97,162 @@ describe('groupWordsIntoSegments', () => {
     ];
     const segments = groupWordsIntoSegments(shortWords, 2000);
     expect(segments).toHaveLength(1);
+  });
+});
+
+describe('horizonIntensity', () => {
+  // Helper: make a word with only its start time meaningful for the intensity function.
+  const wordAt = (startMs: number): TimedWord => ({
+    text: 'w',
+    start: startMs,
+    end: startMs + 500,
+    original: 'w',
+  });
+
+  describe('future (approaching) words', () => {
+    it('is 1.0 at the exact start time', () => {
+      expect(horizonIntensity(wordAt(10_000), 10_000)).toBe(1.0);
+    });
+
+    it('is 1.0 within the full-intensity window (0 < d < 1.5s)', () => {
+      expect(horizonIntensity(wordAt(10_500), 10_000)).toBe(1.0);
+      expect(horizonIntensity(wordAt(11_499), 10_000)).toBe(1.0);
+    });
+
+    it('is 1.0 at the 1.5s knee (ramp begin)', () => {
+      expect(horizonIntensity(wordAt(11_500), 10_000)).toBe(1.0);
+    });
+
+    it('is 0.75 at the 1.5s-3s midpoint (d=2.25s)', () => {
+      expect(horizonIntensity(wordAt(12_250), 10_000)).toBeCloseTo(0.75);
+    });
+
+    it('is 0.5 at the 3s knee', () => {
+      expect(horizonIntensity(wordAt(13_000), 10_000)).toBeCloseTo(0.5);
+    });
+
+    it('is 0.25 at the 3s-10s midpoint (d=6.5s)', () => {
+      expect(horizonIntensity(wordAt(16_500), 10_000)).toBeCloseTo(0.25);
+    });
+
+    it('approaches 0 just before the 10s knee', () => {
+      expect(horizonIntensity(wordAt(19_999), 10_000)).toBeCloseTo(0.0, 3);
+    });
+
+    it('is 0 at the 10s knee', () => {
+      expect(horizonIntensity(wordAt(20_000), 10_000)).toBe(0);
+    });
+
+    it('is 0 well beyond the 10s future window', () => {
+      expect(horizonIntensity(wordAt(30_000), 10_000)).toBe(0);
+    });
+  });
+
+  describe('past (decaying) words', () => {
+    it('is 1.0 within the 0.75s past-full window', () => {
+      expect(horizonIntensity(wordAt(9_500), 10_000)).toBe(1.0);
+      expect(horizonIntensity(wordAt(9_251), 10_000)).toBe(1.0);
+    });
+
+    it('is 1.0 at the 0.75s knee (ramp begin)', () => {
+      expect(horizonIntensity(wordAt(9_250), 10_000)).toBe(1.0);
+    });
+
+    it('is 0.75 at the 0.75s-1.5s midpoint (d=1.125s)', () => {
+      expect(horizonIntensity(wordAt(8_875), 10_000)).toBeCloseTo(0.75);
+    });
+
+    it('is 0.5 at the 1.5s knee', () => {
+      expect(horizonIntensity(wordAt(8_500), 10_000)).toBeCloseTo(0.5);
+    });
+
+    it('is 0.25 at the 1.5s-5s midpoint (d=3.25s)', () => {
+      expect(horizonIntensity(wordAt(6_750), 10_000)).toBeCloseTo(0.25);
+    });
+
+    it('is 0 at the 5s knee', () => {
+      expect(horizonIntensity(wordAt(5_000), 10_000)).toBe(0);
+    });
+
+    it('is 0 well beyond the 5s past window', () => {
+      expect(horizonIntensity(wordAt(0), 10_000)).toBe(0);
+    });
+  });
+
+  describe('asymmetry (past decays 2x faster than future ramps)', () => {
+    // At 50% intensity, future boundary is at 3s out, past boundary is at 1.5s ago.
+    // Confirming 2x asymmetry at the knee.
+    it('50% intensity at +3s future equals 50% at -1.5s past', () => {
+      const futureMid = horizonIntensity(wordAt(13_000), 10_000);
+      const pastMid = horizonIntensity(wordAt(8_500), 10_000);
+      expect(futureMid).toBeCloseTo(pastMid);
+      expect(futureMid).toBeCloseTo(0.5);
+    });
+  });
+});
+
+describe('findHorizonWindow', () => {
+  // Words spaced 1s apart so time<->index math is easy.
+  const spacedWords: TimedWord[] = Array.from({ length: 60 }, (_, i) => ({
+    text: `w${i}`,
+    start: i * 1000,
+    end: i * 1000 + 500,
+    original: `w${i}`,
+  }));
+
+  it('returns [-1, -1] for empty words', () => {
+    expect(findHorizonWindow([], 10_000)).toEqual([-1, -1]);
+  });
+
+  it('returns [-1, -1] when nowMs is far before any word', () => {
+    // Words start at 0; "now" is 20s before word 0, so the +10s future window
+    // still doesn't reach word 0 at time=0.
+    expect(findHorizonWindow(spacedWords, -20_000)).toEqual([-1, -1]);
+  });
+
+  it('returns [-1, -1] when nowMs is far past the last word', () => {
+    // Last word is at 59_000ms. "Now" at 200_000ms is 141s past; even the
+    // -5s past tail doesn't reach word 59 at time=59_000.
+    expect(findHorizonWindow(spacedWords, 200_000)).toEqual([-1, -1]);
+  });
+
+  it('includes words within [nowMs - 5000, nowMs + 10000]', () => {
+    // nowMs=30_000: window is word.start in [25_000, 40_000] → indices 25..40
+    const [start, end] = findHorizonWindow(spacedWords, 30_000);
+    expect(start).toBe(25);
+    expect(end).toBe(40);
+  });
+
+  it('includes word whose start equals the past boundary exactly', () => {
+    // word 25 starts at 25_000 = 30_000 - 5000 (boundary)
+    const [start] = findHorizonWindow(spacedWords, 30_000);
+    expect(start).toBe(25);
+  });
+
+  it('includes word whose start equals the future boundary exactly', () => {
+    // word 40 starts at 40_000 = 30_000 + 10_000 (boundary)
+    const [, end] = findHorizonWindow(spacedWords, 30_000);
+    expect(end).toBe(40);
+  });
+
+  it('clips to the start of the word array', () => {
+    // Near beginning: window would want words from start = -3000, clip to 0
+    const [start, end] = findHorizonWindow(spacedWords, 2_000);
+    expect(start).toBe(0);
+    expect(end).toBe(12);
+  });
+
+  it('clips to the end of the word array', () => {
+    // Near end: window would want words up to start = 68_000, clip to 59
+    const [start, end] = findHorizonWindow(spacedWords, 58_000);
+    expect(start).toBe(53);
+    expect(end).toBe(59);
+  });
+
+  it('handles a single-word array', () => {
+    const single = [spacedWords[0]];
+    expect(findHorizonWindow(single, 0)).toEqual([0, 0]);
+    expect(findHorizonWindow(single, 5_000)).toEqual([0, 0]); // still within past window
+    expect(findHorizonWindow(single, 6_000)).toEqual([-1, -1]); // past 5s boundary
   });
 });

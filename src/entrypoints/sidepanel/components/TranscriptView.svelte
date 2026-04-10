@@ -1,16 +1,22 @@
 <script lang="ts">
   import type { TimedWord, Chapter } from '../../../core/types';
-  import type { WordSegment } from '../../../core/playback-sync';
+  import {
+    findActiveWordIndex,
+    findHorizonWindow,
+    horizonIntensity,
+    type WordSegment,
+  } from '../../../core/playback-sync';
   import { formatTime } from '../../../core/time-format';
 
   interface Props {
     words: TimedWord[];
     segments: WordSegment[];
     chapters: Chapter[];
-    activeWordIndex: number;
+    currentTimeMs: number;
     activeSegmentIndex: number;
     autoScroll: boolean;
     videoId: string;
+    peakCap: number;
     onSeek: (timeMs: number) => void;
     onAutoScrollDisable?: () => void;
   }
@@ -19,13 +25,22 @@
     words,
     segments,
     chapters,
-    activeWordIndex,
+    currentTimeMs,
     activeSegmentIndex,
     autoScroll,
     videoId,
+    peakCap,
     onSeek,
     onAutoScrollDisable,
   }: Props = $props();
+
+  // Range of word indices whose horizon intensity may be nonzero.
+  // Words outside this window render with default (transparent) background.
+  let horizonWindow: [number, number] = $derived(findHorizonWindow(words, currentTimeMs));
+
+  // Index of the word currently being spoken (for the text-color shift).
+  // -1 when no word is active.
+  let currentWordIdx: number = $derived(findActiveWordIndex(words, currentTimeMs));
 
   // Map segment index -> chapter that starts at or just before this segment.
   // Uses a plain object instead of Map to avoid Svelte reactivity lint warning.
@@ -92,7 +107,7 @@
         </a>
       </h3>
     {/if}
-    <p class="segment" class:active={segIdx === activeSegmentIndex} bind:this={segmentEls[segIdx]}>
+    <p class="segment" bind:this={segmentEls[segIdx]}>
       <a
         class="timestamp"
         href={timestampUrl(segment.startTime)}
@@ -106,9 +121,14 @@
       {#each { length: segment.endIndex - segment.startIndex + 1 } as _, i (segment.startIndex + i)}
         {@const wordIdx = segment.startIndex + i}
         {@const word = words[wordIdx]}
+        {@const inHorizon = wordIdx >= horizonWindow[0] && wordIdx <= horizonWindow[1]}
+        {@const intensity = inHorizon
+          ? Math.min(horizonIntensity(word, currentTimeMs), peakCap)
+          : 0}
         <span
           class="word"
-          class:active-word={wordIdx === activeWordIndex}
+          class:current-word={wordIdx === currentWordIdx}
+          style:--word-intensity={intensity}
           data-start={word.start}
           data-end={word.end}
           onclick={() => onSeek(word.start)}
@@ -140,19 +160,19 @@
   }
 
   .chapter-link {
-    color: #c0c8e0;
+    color: var(--chapter-link);
     text-decoration: none;
   }
 
   .chapter-link:hover {
-    color: #e0e8ff;
+    color: var(--chapter-link-hover);
   }
 
   .chapter-timestamp {
     display: block;
     font-size: 11px;
     font-weight: 400;
-    color: #556;
+    color: var(--text-very-dim);
   }
 
   .segment {
@@ -160,38 +180,30 @@
     line-height: 1.6;
     padding: 4px 6px;
     border-radius: 4px;
-    transition: background-color 0.2s;
-  }
-
-  .segment.active {
-    background: rgba(100, 150, 255, 0.15);
   }
 
   .timestamp {
     display: block;
     font-size: 11px;
-    color: #556;
+    color: var(--text-very-dim);
     margin-bottom: 2px;
     text-decoration: none;
   }
 
   .timestamp:hover {
-    color: #88a;
+    color: var(--text-very-dim-hover);
   }
 
   .word {
     cursor: pointer;
-    border-radius: 2px;
-    transition: background-color 0.15s;
+    background-color: rgba(var(--horizon-rgb), var(--word-intensity, 0));
   }
 
   .word:hover {
-    background: rgba(100, 150, 255, 0.15);
+    background: var(--segment-hover);
   }
 
-  .active-word {
-    background: #ffd54f;
-    color: #1a1a2e;
-    font-weight: 600;
+  .current-word {
+    color: var(--current-word-text);
   }
 </style>

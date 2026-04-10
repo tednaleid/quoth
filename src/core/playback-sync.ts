@@ -27,6 +27,70 @@ export function findActiveWordIndex(words: TimedWord[], currentTimeMs: number): 
   return Math.min(high, words.length - 1);
 }
 
+// Piecewise-linear fade horizon knees (seconds relative to word.start).
+// Future (approaching): word fades in from FUTURE_FAR_S to peak at FUTURE_FULL_S.
+// Past (decaying): word fades out from PAST_FULL_S to zero at PAST_FAR_S.
+// Past decays 2x faster than future ramps.
+const FUTURE_FULL_S = 1.5;
+const FUTURE_MID_S = 3;
+const FUTURE_FAR_S = 10;
+const PAST_FULL_S = 0.75;
+const PAST_MID_S = 1.5;
+const PAST_FAR_S = 5;
+
+/**
+ * Returns 0.0-1.0 intensity for a word based on its temporal distance from nowMs.
+ * Words approaching from the future ramp up over 10s; past words decay over 5s.
+ */
+export function horizonIntensity(word: TimedWord, nowMs: number): number {
+  const d = (word.start - nowMs) / 1000;
+  if (d >= 0) {
+    if (d < FUTURE_FULL_S) return 1.0;
+    if (d < FUTURE_MID_S) return 1.0 - 0.5 * ((d - FUTURE_FULL_S) / (FUTURE_MID_S - FUTURE_FULL_S));
+    if (d < FUTURE_FAR_S) return 0.5 - 0.5 * ((d - FUTURE_MID_S) / (FUTURE_FAR_S - FUTURE_MID_S));
+    return 0;
+  }
+  const p = -d;
+  if (p < PAST_FULL_S) return 1.0;
+  if (p < PAST_MID_S) return 1.0 - 0.5 * ((p - PAST_FULL_S) / (PAST_MID_S - PAST_FULL_S));
+  if (p < PAST_FAR_S) return 0.5 - 0.5 * ((p - PAST_MID_S) / (PAST_FAR_S - PAST_MID_S));
+  return 0;
+}
+
+/**
+ * Returns the inclusive [startIdx, endIdx] range of words whose intensity may be nonzero.
+ * Range: word.start in [nowMs - PAST_FAR_S*1000, nowMs + FUTURE_FAR_S*1000].
+ * Returns [-1, -1] if no word falls in the window.
+ */
+export function findHorizonWindow(words: TimedWord[], nowMs: number): [number, number] {
+  if (words.length === 0) return [-1, -1];
+  const minStart = nowMs - PAST_FAR_S * 1000;
+  const maxStart = nowMs + FUTURE_FAR_S * 1000;
+
+  // First index with word.start >= minStart
+  let lo = 0;
+  let hi = words.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (words[mid].start < minStart) lo = mid + 1;
+    else hi = mid;
+  }
+  const startIdx = lo;
+  if (startIdx >= words.length) return [-1, -1];
+  if (words[startIdx].start > maxStart) return [-1, -1];
+
+  // Last index with word.start <= maxStart
+  lo = startIdx;
+  hi = words.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (words[mid].start <= maxStart) lo = mid + 1;
+    else hi = mid;
+  }
+  const endIdx = lo - 1;
+  return [startIdx, endIdx];
+}
+
 const SENTENCE_END_RE = /[.!?]$/;
 
 function isSentenceEnd(text: string): boolean {

@@ -13,8 +13,8 @@
   .status-bar {
     padding: 4px 12px;
     font-size: 12px;
-    color: #666;
-    border-top: 1px solid #2a2a4a;
+    color: var(--text-dimmer);
+    border-top: 1px solid var(--border-dim);
     flex-shrink: 0;
   }
 </style>

@@ -75,6 +75,10 @@ debug-firefox *URL:
     just build
     bun run tools/debug-firefox.ts {{URL}}
 
+# Open the fade-horizon palette mockup page in the default browser
+mockup:
+    open tools/horizon-mockup.html
+
 # Download a YouTube transcript (URL or video ID, saves to .llm/ by default)
 transcript *ARGS:
     bun run tools/transcript.ts {{ARGS}}

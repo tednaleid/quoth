@@ -27,10 +27,11 @@ export class YouTubeVideoPlayer implements VideoPlayer {
   }
 
   onTimeUpdate(callback: (state: VideoPlayerState) => void): () => void {
+    // 100ms poll for smooth fade-horizon sweep in the sidepanel.
     const interval = setInterval(() => {
       if (!this.deps.getVideoElement()) return;
       callback(this.getState());
-    }, 250);
+    }, 100);
     return () => clearInterval(interval);
   }
 }

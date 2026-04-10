@@ -1,0 +1,643 @@
+<!doctype html>
+<!--
+  ABOUTME: Standalone mockup page for comparing fade-horizon color palettes.
+  ABOUTME: Open with `just mockup` or directly in a browser. No server required.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quoth fade-horizon palettes</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #0e0e14;
+        color: #e0e0e0;
+      }
+      h1 {
+        margin: 0 0 4px 0;
+        font-size: 20px;
+      }
+      .subtitle {
+        color: #888;
+        margin: 0 0 20px 0;
+        font-size: 13px;
+      }
+      .controls {
+        position: sticky;
+        top: 0;
+        background: #0e0e14;
+        padding: 12px 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 10;
+      }
+      .controls .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .controls label {
+        font-size: 12px;
+        color: #aaa;
+      }
+      .controls input[type='range'] {
+        flex: 1;
+        min-width: 300px;
+      }
+      .controls button {
+        background: #2a2a3a;
+        color: #e0e0e0;
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 4px 10px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      .controls button:hover {
+        background: #363648;
+      }
+      .controls .knees {
+        font-size: 11px;
+        color: #777;
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      @media (min-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .card {
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid #2a2a3a;
+      }
+      .card-header {
+        padding: 8px 14px;
+        background: #171720;
+        border-bottom: 1px solid #2a2a3a;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .card-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #e0e0e0;
+      }
+      .card-chips {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        user-select: none;
+        font-size: 11px;
+        color: #888;
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .chip-label {
+        color: #666;
+      }
+      .chip-swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        border: 1px solid #444;
+        flex-shrink: 0;
+      }
+      .chip-hex {
+        color: #aaa;
+      }
+      .chip input[type='color'] {
+        /* Hide native input but keep it clickable via the wrapping label. */
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+        width: 0;
+        height: 0;
+      }
+      .card-body {
+        padding: 14px 16px;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 15px;
+        line-height: 1.65;
+        min-height: 140px;
+      }
+      .word {
+        cursor: pointer;
+        background-color: rgba(var(--horizon-rgb), var(--word-intensity, 0));
+      }
+      .current-word {
+        color: var(--current-word-text);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Quoth fade-horizon palette comparison</h1>
+    <p class="subtitle">
+      Drag the slider or press play to sweep "now" through the transcript. All 10 palettes render
+      the same text with the same horizon curve so you can compare them side by side.
+    </p>
+
+    <div class="controls">
+      <div class="row">
+        <button id="play-btn">▶ Play</button>
+        <label for="time-slider">now</label>
+        <input type="range" id="time-slider" min="0" max="100" step="0.1" value="50" />
+        <span id="time-label" style="font-family: ui-monospace, Menlo, monospace; font-size: 12px"
+          >0.0s</span
+        >
+      </div>
+      <div class="row">
+        <label for="cap-slider">peak cap</label>
+        <input type="range" id="cap-slider" min="0.4" max="1.0" step="0.05" value="0.8" />
+        <span id="cap-label" style="font-family: ui-monospace, Menlo, monospace; font-size: 12px"
+          >0.80</span
+        >
+        <span class="knees"
+          >knees: future 1.5 / 3 / 10 &nbsp;·&nbsp; past 0.75 / 1.5 / 5 (2× faster decay)</span
+        >
+      </div>
+    </div>
+
+    <div class="grid" id="cards"></div>
+
+    <script>
+      // ---------- Data ----------
+      // Transcript from the screenshot. Split on whitespace; assign each word a start time.
+      const TRANSCRIPT =
+        "All right. Before I bring up Dex, I gotta say I met James. And James Yeah. Can you stand up real fast? James told me this morning that he is going to be the QR code guy. He's going to be having dinner tonight and everybody's invited. So, if you want to go, just scan that QR code real fast and go hang out with James. That's awesome. And that's what we're going for here. That is great.";
+
+      // Roughly 2.5 words/sec gives ~400ms per word.
+      const WORD_MS = 400;
+      const words = TRANSCRIPT.split(/\s+/).map((text, i) => ({
+        text,
+        start: i * WORD_MS,
+      }));
+      const MAX_MS = (words.length - 1) * WORD_MS;
+
+      // ---------- Intensity curve ----------
+      const FUTURE_FULL_S = 1.5;
+      const FUTURE_MID_S = 3;
+      const FUTURE_FAR_S = 10;
+      const PAST_FULL_S = 0.75;
+      const PAST_MID_S = 1.5;
+      const PAST_FAR_S = 5;
+
+      function horizonIntensity(wordStartMs, nowMs) {
+        const d = (wordStartMs - nowMs) / 1000;
+        if (d >= 0) {
+          if (d < FUTURE_FULL_S) return 1.0;
+          if (d < FUTURE_MID_S)
+            return 1.0 - 0.5 * ((d - FUTURE_FULL_S) / (FUTURE_MID_S - FUTURE_FULL_S));
+          if (d < FUTURE_FAR_S)
+            return 0.5 - 0.5 * ((d - FUTURE_MID_S) / (FUTURE_FAR_S - FUTURE_MID_S));
+          return 0;
+        }
+        const p = -d;
+        if (p < PAST_FULL_S) return 1.0;
+        if (p < PAST_MID_S) return 1.0 - 0.5 * ((p - PAST_FULL_S) / (PAST_MID_S - PAST_FULL_S));
+        if (p < PAST_FAR_S) return 0.5 - 0.5 * ((p - PAST_MID_S) / (PAST_FAR_S - PAST_MID_S));
+        return 0;
+      }
+
+      function findCurrentWordIdx(nowMs) {
+        // Last word whose start <= nowMs
+        let idx = -1;
+        for (let i = 0; i < words.length; i++) {
+          if (words[i].start <= nowMs) idx = i;
+          else break;
+        }
+        return idx;
+      }
+
+      // ---------- Palettes (all dark mode, terminal-inspired) ----------
+      // Each palette: {name, bg, text, peak, current} — all hex.
+      // `current` is the text color for the word currently being spoken; pick
+      // a complementary accent that's distinct from both `text` and `peak`.
+      const palettes = [
+        // Gruvbox dark (bg #282828 · text #ebdbb2)
+        {
+          name: 'Gruvbox yellow',
+          bg: '#282828',
+          text: '#ebdbb2',
+          peak: '#fabd2f',
+          current: '#ffffff',
+        },
+        {
+          name: 'Gruvbox orange',
+          bg: '#282828',
+          text: '#ebdbb2',
+          peak: '#fe8019',
+          current: '#ffffff',
+        },
+        {
+          name: 'Gruvbox red',
+          bg: '#282828',
+          text: '#ebdbb2',
+          peak: '#fb4934',
+          current: '#ffffff',
+        },
+        {
+          name: 'Gruvbox green',
+          bg: '#282828',
+          text: '#ebdbb2',
+          peak: '#b8bb26',
+          current: '#ffffff',
+        },
+        {
+          name: 'Gruvbox aqua',
+          bg: '#282828',
+          text: '#ebdbb2',
+          peak: '#8ec07c',
+          current: '#ffffff',
+        },
+        {
+          name: 'Gruvbox purple',
+          bg: '#282828',
+          text: '#ebdbb2',
+          peak: '#d3869b',
+          current: '#ffffff',
+        },
+
+        // Dracula (bg #282a36 · text #f8f8f2)
+        {
+          name: 'Dracula purple',
+          bg: '#282a36',
+          text: '#f8f8f2',
+          peak: '#bd93f9',
+          current: '#ffffff',
+        },
+        {
+          name: 'Dracula pink',
+          bg: '#282a36',
+          text: '#f8f8f2',
+          peak: '#ff79c6',
+          current: '#ffffff',
+        },
+        {
+          name: 'Dracula green',
+          bg: '#282a36',
+          text: '#f8f8f2',
+          peak: '#50fa7b',
+          current: '#ffffff',
+        },
+        {
+          name: 'Dracula cyan',
+          bg: '#282a36',
+          text: '#f8f8f2',
+          peak: '#8be9fd',
+          current: '#ffffff',
+        },
+        {
+          name: 'Dracula orange',
+          bg: '#282a36',
+          text: '#f8f8f2',
+          peak: '#ffb86c',
+          current: '#ffffff',
+        },
+        {
+          name: 'Dracula red',
+          bg: '#282a36',
+          text: '#f8f8f2',
+          peak: '#ff5555',
+          current: '#ffffff',
+        },
+        {
+          name: 'Dracula yellow',
+          bg: '#282a36',
+          text: '#f8f8f2',
+          peak: '#f1fa8c',
+          current: '#ffffff',
+        },
+
+        // Monokai (bg #272822 · text #f8f8f2)
+        {
+          name: 'Monokai green',
+          bg: '#272822',
+          text: '#f8f8f2',
+          peak: '#a6e22e',
+          current: '#ffffff',
+        },
+        {
+          name: 'Monokai pink',
+          bg: '#272822',
+          text: '#f8f8f2',
+          peak: '#f92672',
+          current: '#ffffff',
+        },
+        {
+          name: 'Monokai orange',
+          bg: '#272822',
+          text: '#f8f8f2',
+          peak: '#fd971f',
+          current: '#ffffff',
+        },
+        {
+          name: 'Monokai yellow',
+          bg: '#272822',
+          text: '#f8f8f2',
+          peak: '#e6db74',
+          current: '#ffffff',
+        },
+        {
+          name: 'Monokai cyan',
+          bg: '#272822',
+          text: '#f8f8f2',
+          peak: '#66d9ef',
+          current: '#ffffff',
+        },
+        {
+          name: 'Monokai purple',
+          bg: '#272822',
+          text: '#f8f8f2',
+          peak: '#ae81ff',
+          current: '#ffffff',
+        },
+
+        // Catppuccin Mocha (bg #1e1e2e · text #cdd6f4)
+        {
+          name: 'Catppuccin peach',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#fab387',
+          current: '#ffffff',
+        },
+        {
+          name: 'Catppuccin mauve',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#cba6f7',
+          current: '#ffffff',
+        },
+        {
+          name: 'Catppuccin pink',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#f5c2e7',
+          current: '#ffffff',
+        },
+        {
+          name: 'Catppuccin red',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#f38ba8',
+          current: '#ffffff',
+        },
+        {
+          name: 'Catppuccin maroon',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#eba0ac',
+          current: '#ffffff',
+        },
+        {
+          name: 'Catppuccin yellow',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#f9e2af',
+          current: '#ffffff',
+        },
+        {
+          name: 'Catppuccin green',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#a6e3a1',
+          current: '#ffffff',
+        },
+        {
+          name: 'Catppuccin teal',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#94e2d5',
+          current: '#ffffff',
+        },
+        {
+          name: 'Catppuccin sky',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#89dceb',
+          current: '#ffffff',
+        },
+        {
+          name: 'Catppuccin lavender',
+          bg: '#1e1e2e',
+          text: '#cdd6f4',
+          peak: '#b4befe',
+          current: '#ffffff',
+        },
+
+        // Other terminal themes
+        {
+          name: 'Solarized gold',
+          bg: '#002b36',
+          text: '#93a1a1',
+          peak: '#b58900',
+          current: '#ffffff',
+        },
+        {
+          name: 'One Dark peach',
+          bg: '#282c34',
+          text: '#abb2bf',
+          peak: '#e5c07b',
+          current: '#ffffff',
+        },
+        {
+          name: 'Tokyo Night orange',
+          bg: '#1a1b26',
+          text: '#c0caf5',
+          peak: '#ff9e64',
+          current: '#ffffff',
+        },
+        {
+          name: 'Rose Pine gold',
+          bg: '#191724',
+          text: '#e0def4',
+          peak: '#f6c177',
+          current: '#ffffff',
+        },
+      ];
+
+      // ---------- Helpers ----------
+      function hexToRgbString(hex) {
+        const h = hex.replace('#', '');
+        const r = parseInt(h.substring(0, 2), 16);
+        const g = parseInt(h.substring(2, 4), 16);
+        const b = parseInt(h.substring(4, 6), 16);
+        return `${r}, ${g}, ${b}`;
+      }
+
+      function applyPaletteToBody(body, palette) {
+        body.style.setProperty('--bg', palette.bg);
+        body.style.setProperty('--text', palette.text);
+        body.style.setProperty('--horizon-rgb', hexToRgbString(palette.peak));
+        body.style.setProperty('--current-word-text', palette.current);
+      }
+
+      // ---------- Build cards once ----------
+      const cardsEl = document.getElementById('cards');
+      const cardBodies = []; // { spans }
+
+      function makeChip(palette, key, labelText, body) {
+        // <label class="chip"> bg <span .swatch></span> <span .hex>#...</span> <input type=color></label>
+        const label = document.createElement('label');
+        label.className = 'chip';
+        label.title = `Edit ${labelText}`;
+
+        const lbl = document.createElement('span');
+        lbl.className = 'chip-label';
+        lbl.textContent = labelText;
+
+        const swatch = document.createElement('span');
+        swatch.className = 'chip-swatch';
+        swatch.style.background = palette[key];
+
+        const hex = document.createElement('span');
+        hex.className = 'chip-hex';
+        hex.textContent = palette[key];
+
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = palette[key];
+        input.addEventListener('input', () => {
+          palette[key] = input.value;
+          swatch.style.background = input.value;
+          hex.textContent = input.value;
+          applyPaletteToBody(body, palette);
+        });
+
+        label.appendChild(lbl);
+        label.appendChild(swatch);
+        label.appendChild(hex);
+        label.appendChild(input);
+        return label;
+      }
+
+      for (const p of palettes) {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        const header = document.createElement('div');
+        header.className = 'card-header';
+
+        const title = document.createElement('span');
+        title.className = 'card-title';
+        title.textContent = p.name;
+
+        const chips = document.createElement('div');
+        chips.className = 'card-chips';
+
+        const body = document.createElement('div');
+        body.className = 'card-body';
+        applyPaletteToBody(body, p);
+
+        chips.appendChild(makeChip(p, 'bg', 'bg', body));
+        chips.appendChild(makeChip(p, 'text', 'text', body));
+        chips.appendChild(makeChip(p, 'peak', 'peak', body));
+        chips.appendChild(makeChip(p, 'current', 'current', body));
+
+        header.appendChild(title);
+        header.appendChild(chips);
+
+        const spans = [];
+        for (const w of words) {
+          const span = document.createElement('span');
+          span.className = 'word';
+          span.textContent = w.text + ' ';
+          body.appendChild(span);
+          spans.push(span);
+        }
+
+        card.appendChild(header);
+        card.appendChild(body);
+        cardsEl.appendChild(card);
+        cardBodies.push({ spans });
+      }
+
+      // ---------- Render on slider / play ----------
+      const slider = document.getElementById('time-slider');
+      const label = document.getElementById('time-label');
+      const capSlider = document.getElementById('cap-slider');
+      const capLabel = document.getElementById('cap-label');
+      const playBtn = document.getElementById('play-btn');
+
+      slider.max = String(MAX_MS);
+      slider.value = String(Math.floor(MAX_MS * 0.5));
+
+      let cap = parseFloat(capSlider.value);
+
+      function render() {
+        const nowMs = parseFloat(slider.value);
+        label.textContent = (nowMs / 1000).toFixed(1) + 's';
+        const currentIdx = findCurrentWordIdx(nowMs);
+        for (const { spans } of cardBodies) {
+          for (let i = 0; i < spans.length; i++) {
+            const intensity = Math.min(horizonIntensity(words[i].start, nowMs), cap);
+            const span = spans[i];
+            span.style.setProperty('--word-intensity', String(intensity));
+            if (i === currentIdx) span.classList.add('current-word');
+            else span.classList.remove('current-word');
+          }
+        }
+      }
+
+      slider.addEventListener('input', render);
+      capSlider.addEventListener('input', () => {
+        cap = parseFloat(capSlider.value);
+        capLabel.textContent = cap.toFixed(2);
+        render();
+      });
+
+      // ---------- Play/pause ----------
+      let playing = false;
+      let rafId = null;
+      let lastTs = 0;
+      function tick(ts) {
+        if (!playing) return;
+        if (lastTs === 0) lastTs = ts;
+        const dt = ts - lastTs;
+        lastTs = ts;
+        let nowMs = parseFloat(slider.value) + dt;
+        if (nowMs > MAX_MS) nowMs = 0;
+        slider.value = String(nowMs);
+        render();
+        rafId = requestAnimationFrame(tick);
+      }
+      playBtn.addEventListener('click', () => {
+        playing = !playing;
+        playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
+        if (playing) {
+          lastTs = 0;
+          rafId = requestAnimationFrame(tick);
+        } else if (rafId) {
+          cancelAnimationFrame(rafId);
+        }
+      });
+
+      render();
+    </script>
+  </body>
+</html>

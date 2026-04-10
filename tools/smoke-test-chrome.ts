@@ -109,6 +109,31 @@ if (wordStart && timeAfter !== null) {
   }
 }
 
+// --- Fade horizon proof-of-life ---
+// After the seek, playback should resume and the fade horizon should populate
+// the --word-intensity CSS var on words near the current playback time.
+console.log('\n--- Fade horizon test ---');
+await ytPage.evaluate(() => {
+  const video = document.querySelector('video') as HTMLVideoElement | null;
+  if (video) void video.play();
+});
+await sidePanelPage.waitForTimeout(1500);
+
+const litWordCount = await sidePanelPage.locator('.word').evaluateAll((els) => {
+  return els.filter((el) => {
+    const intensity = parseFloat((el as HTMLElement).style.getPropertyValue('--word-intensity'));
+    return Number.isFinite(intensity) && intensity > 0;
+  }).length;
+});
+console.log(`Words with nonzero --word-intensity: ${litWordCount}`);
+if (litWordCount === 0) {
+  console.log('Fade horizon: NOT RENDERING');
+  await sidePanelPage.screenshot({ path: '.output/smoke-test-horizon-failure.png' });
+  await context.close();
+  process.exit(1);
+}
+console.log('Fade horizon: WORKING');
+
 // --- Popout tab test ---
 console.log('\n--- Popout tab test ---');
 const popoutPage = await context.newPage();

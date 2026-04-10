@@ -5,11 +5,7 @@
 
 import type { TimedWord, VideoInfo, Chapter } from './types';
 import type { WordSegment } from './playback-sync';
-import {
-  findActiveWordIndex,
-  findActiveSegmentIndex,
-  groupWordsIntoSegments,
-} from './playback-sync';
+import { findActiveSegmentIndex, groupWordsIntoSegments } from './playback-sync';
 import type { ContentMessage } from '../messages';
 
 const SEGMENT_GAP_MS = 2000;
@@ -19,7 +15,7 @@ export interface TranscriptState {
   words: TimedWord[];
   segments: WordSegment[];
   chapters: Chapter[];
-  activeWordIndex: number;
+  currentTimeMs: number;
   activeSegmentIndex: number;
   status: string;
 }
@@ -30,7 +26,7 @@ export function createInitialState(): TranscriptState {
     words: [],
     segments: [],
     chapters: [],
-    activeWordIndex: -1,
+    currentTimeMs: 0,
     activeSegmentIndex: -1,
     status: 'Open a YouTube video to see its transcript.',
   };
@@ -58,7 +54,7 @@ export function handleMessage(state: TranscriptState, message: ContentMessage): 
       if (state.words.length === 0) return state;
       return {
         ...state,
-        activeWordIndex: findActiveWordIndex(state.words, message.currentTimeMs),
+        currentTimeMs: message.currentTimeMs,
         activeSegmentIndex: findActiveSegmentIndex(state.segments, message.currentTimeMs),
       };
   }

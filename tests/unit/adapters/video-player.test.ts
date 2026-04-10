@@ -78,7 +78,7 @@ describe('YouTubeVideoPlayer.seekTo', () => {
 });
 
 describe('YouTubeVideoPlayer.onTimeUpdate', () => {
-  it('calls callback with current state after 250ms', () => {
+  it('calls callback with current state after 100ms', () => {
     vi.useFakeTimers();
     const video = mockVideo({ currentTime: 10.0, paused: false, duration: 60.0 });
     const { player } = makePlayer(video);
@@ -87,7 +87,7 @@ describe('YouTubeVideoPlayer.onTimeUpdate', () => {
     const cleanup = player.onTimeUpdate(callback);
     expect(callback).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(100);
     expect(callback).toHaveBeenCalledOnce();
     expect(callback).toHaveBeenCalledWith({
       currentTimeMs: 10000,
@@ -99,13 +99,13 @@ describe('YouTubeVideoPlayer.onTimeUpdate', () => {
     vi.useRealTimers();
   });
 
-  it('calls callback repeatedly at 250ms intervals', () => {
+  it('calls callback repeatedly at 100ms intervals', () => {
     vi.useFakeTimers();
     const { player } = makePlayer(mockVideo());
     const callback = vi.fn();
 
     const cleanup = player.onTimeUpdate(callback);
-    vi.advanceTimersByTime(750);
+    vi.advanceTimersByTime(300);
     expect(callback).toHaveBeenCalledTimes(3);
 
     cleanup();
@@ -118,11 +118,11 @@ describe('YouTubeVideoPlayer.onTimeUpdate', () => {
     const callback = vi.fn();
 
     const cleanup = player.onTimeUpdate(callback);
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(100);
     expect(callback).toHaveBeenCalledTimes(1);
 
     cleanup();
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(100);
     expect(callback).toHaveBeenCalledTimes(1);
 
     vi.useRealTimers();

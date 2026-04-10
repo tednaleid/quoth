@@ -5,8 +5,11 @@
     type TranscriptState,
   } from '../../core/message-handler';
   import { setupPinnedTabConnector } from '../../adapters/browser/pinned-tab-connector';
+  import { SettingsStorage } from '../../adapters/browser/settings-storage';
+  import { DEFAULT_SETTINGS, hexToRgbString, type HighlightSettings } from '../../core/settings';
   import type { ContentMessage, SidePanelMessage } from '../../messages';
   import Header from '../sidepanel/components/Header.svelte';
+  import SettingsPanel from '../sidepanel/components/SettingsPanel.svelte';
   import StatusBar from '../sidepanel/components/StatusBar.svelte';
   import TranscriptView from '../sidepanel/components/TranscriptView.svelte';
 
@@ -18,6 +21,25 @@
   let state: TranscriptState = $state(createInitialState());
   let autoScroll = $state(true);
   let disconnected = $state(false);
+  let settings: HighlightSettings = $state({ ...DEFAULT_SETTINGS });
+  let settingsOpen = $state(false);
+
+  const settingsStorage = new SettingsStorage(browser.storage.local);
+  settingsStorage
+    .load()
+    .then((loaded) => {
+      settings = loaded;
+    })
+    .catch((err) => {
+      console.warn('[quoth popout] failed to load settings:', err);
+    });
+
+  function updateSettings(next: HighlightSettings) {
+    settings = next;
+    settingsStorage.save(next).catch((err) => {
+      console.warn('[quoth popout] failed to save settings:', err);
+    });
+  }
 
   // Only handle messages from the pinned tab; ignore time-update when disconnected
   browser.runtime.onMessage.addListener((message: ContentMessage, sender) => {
@@ -50,7 +72,7 @@
       disconnected = true;
       state = {
         ...state,
-        activeWordIndex: -1,
+        currentTimeMs: 0,
         activeSegmentIndex: -1,
         status: reason === 'tab-closed' ? 'YouTube tab closed' : 'Video navigated away',
       };
@@ -61,23 +83,34 @@
   });
 </script>
 
-<main class:disconnected>
+<main
+  class:disconnected
+  style:--bg={settings.bg}
+  style:--text={settings.text}
+  style:--horizon-rgb={hexToRgbString(settings.peak)}
+  style:--current-word-text={settings.current}
+>
   <Header
     title={state.videoInfo?.title ?? ''}
     {autoScroll}
     onToggleAutoScroll={() => (autoScroll = !autoScroll)}
+    settingsOpen
+    onToggleSettings={() => (settingsOpen = !settingsOpen)}
     {disconnected}
   />
+
+  <SettingsPanel {settings} open={settingsOpen} onChange={updateSettings} />
 
   {#if state.words.length > 0}
     <TranscriptView
       words={state.words}
       segments={state.segments}
-      activeWordIndex={state.activeWordIndex}
+      currentTimeMs={state.currentTimeMs}
       activeSegmentIndex={state.activeSegmentIndex}
       chapters={state.chapters}
       {autoScroll}
       videoId={state.videoInfo?.videoId ?? ''}
+      peakCap={settings.peakCap}
       onSeek={handleSeek}
       onAutoScrollDisable={() => (autoScroll = false)}
     />
@@ -99,8 +132,8 @@
       system-ui,
       -apple-system,
       sans-serif;
-    color: #e0e0e0;
-    background: #1a1a2e;
+    color: var(--text);
+    background: var(--bg);
     font-size: 16px;
   }
 
@@ -111,7 +144,7 @@
   .placeholder {
     flex: 1;
     padding: 12px;
-    color: #888;
+    color: var(--text-dim);
     display: flex;
     align-items: center;
     justify-content: center;

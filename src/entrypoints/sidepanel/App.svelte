@@ -5,16 +5,39 @@
     type TranscriptState,
   } from '../../core/message-handler';
   import { setupTabConnector } from '../../adapters/browser/tab-connector';
+  import { SettingsStorage } from '../../adapters/browser/settings-storage';
+  import { DEFAULT_SETTINGS, hexToRgbString, type HighlightSettings } from '../../core/settings';
   import type { ContentMessage, SidePanelMessage } from '../../messages';
   import Header from './components/Header.svelte';
+  import SettingsPanel from './components/SettingsPanel.svelte';
   import StatusBar from './components/StatusBar.svelte';
   import TranscriptView from './components/TranscriptView.svelte';
 
   let state: TranscriptState = $state(createInitialState());
   let autoScroll = $state(true);
+  let settings: HighlightSettings = $state({ ...DEFAULT_SETTINGS });
+  let settingsOpen = $state(false);
 
   // Track the YouTube tab we're connected to (for message filtering and seeking)
   let youtubeTabId: number | null = $state(null);
+
+  // Load + persist user highlight settings via browser.storage.local.
+  const settingsStorage = new SettingsStorage(browser.storage.local);
+  settingsStorage
+    .load()
+    .then((loaded) => {
+      settings = loaded;
+    })
+    .catch((err) => {
+      console.warn('[quoth sidebar] failed to load settings:', err);
+    });
+
+  function updateSettings(next: HighlightSettings) {
+    settings = next;
+    settingsStorage.save(next).catch((err) => {
+      console.warn('[quoth sidebar] failed to save settings:', err);
+    });
+  }
 
   // Only handle messages from the tab we're connected to
   browser.runtime.onMessage.addListener((message: ContentMessage, sender) => {
@@ -57,23 +80,33 @@
   });
 </script>
 
-<main>
+<main
+  style:--bg={settings.bg}
+  style:--text={settings.text}
+  style:--horizon-rgb={hexToRgbString(settings.peak)}
+  style:--current-word-text={settings.current}
+>
   <Header
     title={state.videoInfo?.title ?? ''}
     {autoScroll}
     onToggleAutoScroll={() => (autoScroll = !autoScroll)}
+    settingsOpen
+    onToggleSettings={() => (settingsOpen = !settingsOpen)}
     onPopout={handlePopout}
   />
+
+  <SettingsPanel {settings} open={settingsOpen} onChange={updateSettings} />
 
   {#if state.words.length > 0}
     <TranscriptView
       words={state.words}
       segments={state.segments}
-      activeWordIndex={state.activeWordIndex}
+      currentTimeMs={state.currentTimeMs}
       activeSegmentIndex={state.activeSegmentIndex}
       chapters={state.chapters}
       {autoScroll}
       videoId={state.videoInfo?.videoId ?? ''}
+      peakCap={settings.peakCap}
       onSeek={handleSeek}
       onAutoScrollDisable={() => (autoScroll = false)}
     />
@@ -87,6 +120,41 @@
 </main>
 
 <style>
+  :global(:root) {
+    color-scheme: light dark;
+
+    /* Chrome colors (border, dim text, etc.). The four "palette" vars
+       (--bg, --text, --horizon-rgb, --current-word-text) are set on <main>
+       from user settings, so they don't live here. */
+    --text-dim: #888;
+    --text-dimmer: #666;
+    --text-very-dim: #556;
+    --text-very-dim-hover: #88a;
+    --border-dim: #2a2a4a;
+    --button-border: #333;
+    --button-border-active: #446;
+    --button-text-active: #aac;
+    --chapter-link: #c0c8e0;
+    --chapter-link-hover: #e0e8ff;
+    --segment-hover: rgba(100, 150, 255, 0.15);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :global(:root) {
+      --text-dim: #667;
+      --text-dimmer: #889;
+      --text-very-dim: #99a;
+      --text-very-dim-hover: #556;
+      --border-dim: #dde;
+      --button-border: #ccd;
+      --button-border-active: #99a;
+      --button-text-active: #334;
+      --chapter-link: #3a4a7a;
+      --chapter-link-hover: #1a2340;
+      --segment-hover: rgba(60, 110, 220, 0.1);
+    }
+  }
+
   main {
     display: flex;
     flex-direction: column;
@@ -95,15 +163,15 @@
       system-ui,
       -apple-system,
       sans-serif;
-    color: #e0e0e0;
-    background: #1a1a2e;
+    color: var(--text);
+    background: var(--bg);
     font-size: 16px;
   }
 
   .placeholder {
     flex: 1;
     padding: 12px;
-    color: #888;
+    color: var(--text-dim);
     display: flex;
     align-items: center;
     justify-content: center;

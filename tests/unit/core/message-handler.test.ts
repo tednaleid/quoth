@@ -24,7 +24,7 @@ describe('createInitialState', () => {
     expect(state.videoInfo).toBeNull();
     expect(state.words).toEqual([]);
     expect(state.segments).toEqual([]);
-    expect(state.activeWordIndex).toBe(-1);
+    expect(state.currentTimeMs).toBe(0);
     expect(state.activeSegmentIndex).toBe(-1);
     expect(state.status).toBe('Open a YouTube video to see its transcript.');
   });
@@ -134,7 +134,7 @@ describe('handleMessage', () => {
         words,
         segments: [{ startIndex: 0, endIndex: 3, startTime: 1000, endTime: 6000 }],
         chapters: [],
-        activeWordIndex: 2,
+        currentTimeMs: 5000,
         activeSegmentIndex: 0,
         status: '4 words loaded',
       };
@@ -143,14 +143,14 @@ describe('handleMessage', () => {
       expect(next.videoInfo).toBeNull();
       expect(next.words).toEqual([]);
       expect(next.segments).toEqual([]);
-      expect(next.activeWordIndex).toBe(-1);
+      expect(next.currentTimeMs).toBe(0);
       expect(next.activeSegmentIndex).toBe(-1);
       expect(next.status).toBe('Open a YouTube video to see its transcript.');
     });
   });
 
   describe('time-update', () => {
-    it('updates activeWordIndex and activeSegmentIndex when words are loaded', () => {
+    it('updates currentTimeMs and activeSegmentIndex when words are loaded', () => {
       const captionsLoadedState = handleMessage(createInitialState(), {
         type: 'captions-loaded',
         videoId: 'abc123',
@@ -162,11 +162,11 @@ describe('handleMessage', () => {
         isPlaying: true,
       };
       const next = handleMessage(captionsLoadedState, message);
-      expect(next.activeWordIndex).toBe(1);
+      expect(next.currentTimeMs).toBe(1600);
       expect(next.activeSegmentIndex).toBe(0);
     });
 
-    it('does not change indices when words array is empty', () => {
+    it('does not change state when words array is empty', () => {
       const state = createInitialState();
       const message: ContentMessage = {
         type: 'time-update',
@@ -174,7 +174,7 @@ describe('handleMessage', () => {
         isPlaying: true,
       };
       const next = handleMessage(state, message);
-      expect(next.activeWordIndex).toBe(-1);
+      expect(next.currentTimeMs).toBe(0);
       expect(next.activeSegmentIndex).toBe(-1);
     });
 
