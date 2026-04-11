@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { DEFAULT_SETTINGS, hexToRgbString } from '../../../src/core/settings';
 
 describe('DEFAULT_SETTINGS', () => {
-  it('defaults to Dracula red palette', () => {
+  it('defaults to Dracula-inspired red palette', () => {
     expect(DEFAULT_SETTINGS).toEqual({
       bg: '#282a36',
-      text: '#f8f8f2',
+      text: '#e7e7e2',
       peak: '#ff5555',
       current: '#ffffff',
-      peakCap: 0.65,
+      peakCap: 0.53,
+      horizonSeconds: 7.5,
     });
   });
 });

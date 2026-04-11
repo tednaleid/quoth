@@ -62,7 +62,7 @@
       </button>
     {/if}
     <button
-      class="toggle"
+      class="toggle autoscroll"
       class:active={autoScroll}
       onclick={onToggleAutoScroll}
       title={autoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
@@ -103,6 +103,11 @@
     cursor: pointer;
     padding: 2px 6px;
     font-size: 12px;
+  }
+  .toggle.autoscroll {
+    /* Bump the ⬇/⏸ glyph 50% bigger than the other toggle buttons. */
+    font-size: 18px;
+    line-height: 1;
   }
   .toggle.active {
     color: var(--button-text-active);

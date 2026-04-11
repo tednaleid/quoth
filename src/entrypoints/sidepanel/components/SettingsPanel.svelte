@@ -70,9 +70,22 @@
         />
         <span class="hex">{settings.peakCap.toFixed(2)}</span>
       </label>
+      <label class="row slider-row">
+        <span class="label">horizon</span>
+        <input
+          type="range"
+          min="0.5"
+          max="30"
+          step="0.1"
+          value={settings.horizonSeconds}
+          oninput={(e) =>
+            update('horizonSeconds', parseFloat((e.currentTarget as HTMLInputElement).value))}
+        />
+        <span class="hex">{settings.horizonSeconds.toFixed(1)}s</span>
+      </label>
     </div>
     <div class="actions">
-      <button type="button" class="reset" onclick={reset}>Reset to Dracula red</button>
+      <button type="button" class="reset" onclick={reset}>Reset</button>
     </div>
   </div>
 </div>

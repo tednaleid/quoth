@@ -27,45 +27,82 @@ export function findActiveWordIndex(words: TimedWord[], currentTimeMs: number): 
   return Math.min(high, words.length - 1);
 }
 
-// Piecewise-linear fade horizon knees (seconds relative to word.start).
-// Future (approaching): word fades in from FUTURE_FAR_S to peak at FUTURE_FULL_S.
-// Past (decaying): word fades out from PAST_FULL_S to zero at PAST_FAR_S.
-// Past decays 2x faster than future ramps.
-const FUTURE_FULL_S = 1.5;
-const FUTURE_MID_S = 3;
-const FUTURE_FAR_S = 10;
-const PAST_FULL_S = 0.75;
-const PAST_MID_S = 1.5;
-const PAST_FAR_S = 5;
+/**
+ * Piecewise-linear fade horizon knees (seconds relative to word.start).
+ * All six knees are derived from a single `horizonSeconds` tunable via fixed
+ * ratios, so the user can shrink or stretch the whole horizon with one slider
+ * and the curve shape is preserved. Past decays 2x faster than future ramps
+ * (the PAST knees are 1/2 of their FUTURE counterparts).
+ */
+export interface HorizonKnees {
+  futureFull: number;
+  futureMid: number;
+  futureFar: number;
+  pastFull: number;
+  pastMid: number;
+  pastFar: number;
+}
+
+const FUTURE_FULL_RATIO = 0.15;
+const FUTURE_MID_RATIO = 0.3;
+const FUTURE_FAR_RATIO = 1.0;
+const PAST_FULL_RATIO = 0.075;
+const PAST_MID_RATIO = 0.15;
+const PAST_FAR_RATIO = 0.5;
+
+/**
+ * Build a HorizonKnees from a single tunable. `horizonSeconds` is the total
+ * future reach (i.e. the FUTURE_FAR knee); everything else scales from it.
+ * At horizonSeconds=10, the knees reproduce the historical defaults
+ * (future 1.5/3/10, past 0.75/1.5/5).
+ */
+export function makeHorizonKnees(horizonSeconds: number): HorizonKnees {
+  return {
+    futureFull: horizonSeconds * FUTURE_FULL_RATIO,
+    futureMid: horizonSeconds * FUTURE_MID_RATIO,
+    futureFar: horizonSeconds * FUTURE_FAR_RATIO,
+    pastFull: horizonSeconds * PAST_FULL_RATIO,
+    pastMid: horizonSeconds * PAST_MID_RATIO,
+    pastFar: horizonSeconds * PAST_FAR_RATIO,
+  };
+}
 
 /**
  * Returns 0.0-1.0 intensity for a word based on its temporal distance from nowMs.
- * Words approaching from the future ramp up over 10s; past words decay over 5s.
+ * Words approaching from the future ramp up over knees.futureFar seconds;
+ * past words decay over knees.pastFar seconds.
  */
-export function horizonIntensity(word: TimedWord, nowMs: number): number {
+export function horizonIntensity(word: TimedWord, nowMs: number, knees: HorizonKnees): number {
   const d = (word.start - nowMs) / 1000;
   if (d >= 0) {
-    if (d < FUTURE_FULL_S) return 1.0;
-    if (d < FUTURE_MID_S) return 1.0 - 0.5 * ((d - FUTURE_FULL_S) / (FUTURE_MID_S - FUTURE_FULL_S));
-    if (d < FUTURE_FAR_S) return 0.5 - 0.5 * ((d - FUTURE_MID_S) / (FUTURE_FAR_S - FUTURE_MID_S));
+    if (d < knees.futureFull) return 1.0;
+    if (d < knees.futureMid)
+      return 1.0 - 0.5 * ((d - knees.futureFull) / (knees.futureMid - knees.futureFull));
+    if (d < knees.futureFar)
+      return 0.5 - 0.5 * ((d - knees.futureMid) / (knees.futureFar - knees.futureMid));
     return 0;
   }
   const p = -d;
-  if (p < PAST_FULL_S) return 1.0;
-  if (p < PAST_MID_S) return 1.0 - 0.5 * ((p - PAST_FULL_S) / (PAST_MID_S - PAST_FULL_S));
-  if (p < PAST_FAR_S) return 0.5 - 0.5 * ((p - PAST_MID_S) / (PAST_FAR_S - PAST_MID_S));
+  if (p < knees.pastFull) return 1.0;
+  if (p < knees.pastMid)
+    return 1.0 - 0.5 * ((p - knees.pastFull) / (knees.pastMid - knees.pastFull));
+  if (p < knees.pastFar) return 0.5 - 0.5 * ((p - knees.pastMid) / (knees.pastFar - knees.pastMid));
   return 0;
 }
 
 /**
  * Returns the inclusive [startIdx, endIdx] range of words whose intensity may be nonzero.
- * Range: word.start in [nowMs - PAST_FAR_S*1000, nowMs + FUTURE_FAR_S*1000].
+ * Range: word.start in [nowMs - knees.pastFar*1000, nowMs + knees.futureFar*1000].
  * Returns [-1, -1] if no word falls in the window.
  */
-export function findHorizonWindow(words: TimedWord[], nowMs: number): [number, number] {
+export function findHorizonWindow(
+  words: TimedWord[],
+  nowMs: number,
+  knees: HorizonKnees,
+): [number, number] {
   if (words.length === 0) return [-1, -1];
-  const minStart = nowMs - PAST_FAR_S * 1000;
-  const maxStart = nowMs + FUTURE_FAR_S * 1000;
+  const minStart = nowMs - knees.pastFar * 1000;
+  const maxStart = nowMs + knees.futureFar * 1000;
 
   // First index with word.start >= minStart
   let lo = 0;

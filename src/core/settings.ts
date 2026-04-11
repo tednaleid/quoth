@@ -14,15 +14,18 @@ export interface HighlightSettings {
   current: string;
   /** Maximum horizon intensity, 0.0-1.0. Caps peak so text stays readable. */
   peakCap: number;
+  /** Total future reach of the fade horizon, in seconds. All knees scale from this. */
+  horizonSeconds: number;
 }
 
 /** Dracula-inspired red palette, shipped as the out-of-the-box default. */
 export const DEFAULT_SETTINGS: HighlightSettings = {
   bg: '#282a36',
-  text: '#f8f8f2',
+  text: '#e7e7e2',
   peak: '#ff5555',
   current: '#ffffff',
-  peakCap: 0.65,
+  peakCap: 0.53,
+  horizonSeconds: 7.5,
 };
 
 /**

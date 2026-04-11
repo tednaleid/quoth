@@ -4,6 +4,7 @@
     findActiveWordIndex,
     findHorizonWindow,
     horizonIntensity,
+    makeHorizonKnees,
     type WordSegment,
   } from '../../../core/playback-sync';
   import { formatTime } from '../../../core/time-format';
@@ -33,6 +34,7 @@
     autoScroll: boolean;
     videoId: string;
     peakCap: number;
+    horizonSeconds: number;
     onSeek: (timeMs: number) => void;
     onAutoScrollDisable?: () => void;
   }
@@ -45,13 +47,17 @@
     autoScroll,
     videoId,
     peakCap,
+    horizonSeconds,
     onSeek,
     onAutoScrollDisable,
   }: Props = $props();
 
+  // Derived horizon knees from the user-controlled horizonSeconds setting.
+  let knees = $derived(makeHorizonKnees(horizonSeconds));
+
   // Range of word indices whose horizon intensity may be nonzero.
   // Words outside this window render with default (transparent) background.
-  let horizonWindow: [number, number] = $derived(findHorizonWindow(words, currentTimeMs));
+  let horizonWindow: [number, number] = $derived(findHorizonWindow(words, currentTimeMs, knees));
 
   // Index of the word currently being spoken (for the text-color shift).
   // -1 when no word is active.
@@ -104,7 +110,9 @@
   }
 
   // Line-aware auto-scroll. On every current-word change, if the active word
-  // has drifted past the top zone, snap it back near the top.
+  // has drifted past the top zone, snap it back near the top. When the
+  // transcript is already scrolled to the bottom (end of video), skip the
+  // snap entirely so we don't stutter trying to scroll past maxScrollTop.
   $effect(() => {
     // Re-run whenever the current word changes.
     void currentWordIdx;
@@ -116,8 +124,12 @@
     const wordTopInViewport = wordRect.top - containerRect.top;
     const threshold = containerRect.height * TOP_ZONE_FRACTION;
     if (wordTopInViewport > threshold) {
-      const target =
+      const maxScrollTop = transcriptEl.scrollHeight - transcriptEl.clientHeight;
+      // Already at the bottom of the transcript; nothing to scroll to.
+      if (transcriptEl.scrollTop >= maxScrollTop - 1) return;
+      const desired =
         transcriptEl.scrollTop + wordTopInViewport - containerRect.height * SNAP_TARGET_FRACTION;
+      const target = Math.min(desired, maxScrollTop);
       smoothScrollTo(target, SNAP_DURATION_MS);
     }
   });
@@ -183,7 +195,7 @@
         {@const word = words[wordIdx]}
         {@const inHorizon = wordIdx >= horizonWindow[0] && wordIdx <= horizonWindow[1]}
         {@const intensity = inHorizon
-          ? Math.min(horizonIntensity(word, currentTimeMs), peakCap)
+          ? Math.min(horizonIntensity(word, currentTimeMs, knees), peakCap)
           : 0}
         <span
           class="word"

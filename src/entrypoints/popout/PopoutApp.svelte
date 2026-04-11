@@ -62,6 +62,8 @@
     if (!disconnected) {
       sendToTab(pinnedTabId, { type: 'seek-to', timeMs });
     }
+    // Click-to-seek re-enables auto-scroll so the panel follows the new location.
+    autoScroll = true;
   }
 
   setupPinnedTabConnector(pinnedTabId, {
@@ -109,6 +111,7 @@
       {autoScroll}
       videoId={state.videoInfo?.videoId ?? ''}
       peakCap={settings.peakCap}
+      horizonSeconds={settings.horizonSeconds}
       onSeek={handleSeek}
       onAutoScrollDisable={() => (autoScroll = false)}
     />

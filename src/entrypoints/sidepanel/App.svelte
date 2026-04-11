@@ -60,6 +60,10 @@
     if (youtubeTabId) {
       sendToTab(youtubeTabId, { type: 'seek-to', timeMs });
     }
+    // Click-to-seek always re-enables auto-scroll: the user is asking to
+    // jump to a new location, so they want the panel to follow from there
+    // until they break out again (e.g. by scrolling manually).
+    autoScroll = true;
   }
 
   async function handlePopout() {
@@ -106,6 +110,7 @@
       {autoScroll}
       videoId={state.videoInfo?.videoId ?? ''}
       peakCap={settings.peakCap}
+      horizonSeconds={settings.horizonSeconds}
       onSeek={handleSeek}
       onAutoScrollDisable={() => (autoScroll = false)}
     />

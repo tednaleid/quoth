@@ -22,6 +22,7 @@ const customSettings: HighlightSettings = {
   peak: '#fabd2f',
   current: '#ffffff',
   peakCap: 0.65,
+  horizonSeconds: 12,
 };
 
 describe('SettingsStorage', () => {
