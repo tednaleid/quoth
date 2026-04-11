@@ -79,16 +79,14 @@ debug-firefox *URL:
 mockup:
     open tools/horizon-mockup.html
 
-# Re-extract the feather glyph (U+1FAB6) from Noto Sans Symbols 2 into assets/icon.svg
-extract-icon:
-    tools/extract-glyph.py --out assets/icon.svg
-
-# Rasterize assets/icon.svg into the five public/icon/*.png sizes via ImageMagick
+# Resize assets/icon.png (the 128x128 source) into the five public/icon/*.png sizes.
+# 128 is copied verbatim; smaller sizes use Lanczos downscaling.
 icons:
-    @for size in 16 32 48 96 128; do \
-        magick -background none -density 500 assets/icon.svg -resize ${size}x${size} public/icon/${size}.png; \
+    @cp assets/icon.png public/icon/128.png
+    @for size in 16 32 48 96; do \
+        magick assets/icon.png -filter Lanczos -resize ${size}x${size} public/icon/${size}.png; \
     done
-    @ls -la public/icon/
+    @magick identify public/icon/*.png
 
 # Download a YouTube transcript (URL or video ID, saves to .llm/ by default)
 transcript *ARGS:
