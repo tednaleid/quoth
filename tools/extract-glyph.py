@@ -54,14 +54,23 @@ def extract_glyph_svg(font_path: Path, codepoint: int) -> str:
     width = x_max - x_min
     height = y_max - y_min
 
+    # Center the glyph in a SQUARE viewBox. Browser extension manifests
+    # (and Mozilla's signer) require icons to be square, so we pad the
+    # shorter axis equally on both sides and emit viewBox="0 0 side side".
+    side = max(width, height)
+    pad_x = (side - width) / 2
+    pad_y = (side - height) / 2
+
     # Emit path commands with: (1) Y-axis flipped (SVG has Y down), and
-    # (2) translated so the top-left of the tight bbox sits at (0, 0).
+    # (2) translated so the glyph is centered in a (side x side) square.
     #
     # Affine matrix (xx, xy, yx, yy, dx, dy) applied as:
-    #   x' = x*xx + y*yx + dx =  x - x_min
-    #   y' = x*xy + y*yy + dy = -y + y_max
+    #   x' = x*xx + y*yx + dx =  x - x_min + pad_x
+    #   y' = x*xy + y*yy + dy = -y + y_max + pad_y
     svg_pen = SVGPathPen(glyph_set)
-    transform_pen = TransformPen(svg_pen, (1, 0, 0, -1, -x_min, y_max))
+    transform_pen = TransformPen(
+        svg_pen, (1, 0, 0, -1, -x_min + pad_x, y_max + pad_y)
+    )
     glyph.draw(transform_pen)
     d = svg_pen.getCommands()
 
@@ -70,7 +79,7 @@ def extract_glyph_svg(font_path: Path, codepoint: int) -> str:
     # (e.g. `svg path { fill: ... }`) or sed the output.
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" '
-        f'viewBox="0 0 {width:.0f} {height:.0f}">\n'
+        f'viewBox="0 0 {side:.0f} {side:.0f}">\n'
         f'  <path d="{d}" fill="#000000"/>\n'
         "</svg>\n"
     )
