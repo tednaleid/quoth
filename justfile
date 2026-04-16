@@ -6,7 +6,20 @@ default:
     @just --list
 
 # Run all checks: tests, linting, typecheck, format check
-check: test lint typecheck fmt-check
+check: deps test lint typecheck fmt-check
+
+# Ensure bun and node_modules are present; install deps if missing.
+deps:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v bun >/dev/null 2>&1; then
+        echo "Error: bun is not installed. Install via: curl -fsSL https://bun.sh/install | bash" >&2
+        exit 1
+    fi
+    if [ ! -d node_modules ] || [ bun.lock -nt node_modules ]; then
+        echo "Installing dependencies..."
+        bun install --frozen-lockfile
+    fi
 
 # Run unit tests (optionally pass a file pattern, e.g. just test message-handler)
 test *ARGS:
