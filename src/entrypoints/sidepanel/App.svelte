@@ -8,6 +8,7 @@
   import { SettingsStorage } from '../../adapters/browser/settings-storage';
   import { DEFAULT_SETTINGS, hexToRgbString, type HighlightSettings } from '../../core/settings';
   import type { ContentMessage, SidePanelMessage } from '../../messages';
+  import { isSeek } from '../../core/seek-detector';
   import Header from './components/Header.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
   import StatusBar from './components/StatusBar.svelte';
@@ -17,6 +18,8 @@
   let autoScroll = $state(true);
   let settings: HighlightSettings = $state({ ...DEFAULT_SETTINGS });
   let settingsOpen = $state(false);
+  let lastTimeMs: number | null = $state(null);
+  let forceSnapToken = $state(0);
 
   // Track the YouTube tab we're connected to (for message filtering and seeking)
   let youtubeTabId: number | null = $state(null);
@@ -42,6 +45,16 @@
   // Only handle messages from the tab we're connected to
   browser.runtime.onMessage.addListener((message: ContentMessage, sender) => {
     if (sender.tab?.id && sender.tab.id === youtubeTabId) {
+      if (message.type === 'video-detected' || message.type === 'video-left') {
+        lastTimeMs = null;
+      }
+      if (message.type === 'time-update') {
+        if (isSeek(lastTimeMs, message.currentTimeMs)) {
+          autoScroll = true;
+          forceSnapToken++;
+        }
+        lastTimeMs = message.currentTimeMs;
+      }
       state = handleMessage(state, message);
     }
   });
@@ -60,10 +73,8 @@
     if (youtubeTabId) {
       sendToTab(youtubeTabId, { type: 'seek-to', timeMs });
     }
-    // Click-to-seek always re-enables auto-scroll: the user is asking to
-    // jump to a new location, so they want the panel to follow from there
-    // until they break out again (e.g. by scrolling manually).
     autoScroll = true;
+    forceSnapToken++;
   }
 
   async function handlePopout() {
@@ -93,7 +104,10 @@
   <Header
     title={state.videoInfo?.title ?? ''}
     {autoScroll}
-    onToggleAutoScroll={() => (autoScroll = !autoScroll)}
+    onToggleAutoScroll={() => {
+      autoScroll = !autoScroll;
+      if (autoScroll) forceSnapToken++;
+    }}
     settingsOpen
     onToggleSettings={() => (settingsOpen = !settingsOpen)}
     onPopout={handlePopout}
@@ -108,6 +122,7 @@
       currentTimeMs={state.currentTimeMs}
       chapters={state.chapters}
       {autoScroll}
+      {forceSnapToken}
       videoId={state.videoInfo?.videoId ?? ''}
       peakCap={settings.peakCap}
       horizonSeconds={settings.horizonSeconds}

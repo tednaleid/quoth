@@ -32,6 +32,7 @@
     chapters: Chapter[];
     currentTimeMs: number;
     autoScroll: boolean;
+    forceSnapToken?: number;
     videoId: string;
     peakCap: number;
     horizonSeconds: number;
@@ -45,6 +46,7 @@
     chapters,
     currentTimeMs,
     autoScroll,
+    forceSnapToken = 0,
     videoId,
     peakCap,
     horizonSeconds,
@@ -109,29 +111,41 @@
     requestAnimationFrame(step);
   }
 
-  // Line-aware auto-scroll. On every current-word change, if the active word
-  // has drifted past the top zone, snap it back near the top. When the
-  // transcript is already scrolled to the bottom (end of video), skip the
-  // snap entirely so we don't stutter trying to scroll past maxScrollTop.
-  $effect(() => {
-    // Re-run whenever the current word changes.
-    void currentWordIdx;
-    if (!autoScroll || !transcriptEl || currentWordIdx < 0) return;
+  function snapCurrentWordToTop() {
+    if (!transcriptEl) return;
     const wordEl = transcriptEl.querySelector('.current-word') as HTMLElement | null;
     if (!wordEl) return;
     const wordRect = wordEl.getBoundingClientRect();
     const containerRect = transcriptEl.getBoundingClientRect();
     const wordTopInViewport = wordRect.top - containerRect.top;
-    const threshold = containerRect.height * TOP_ZONE_FRACTION;
-    if (wordTopInViewport > threshold) {
-      const maxScrollTop = transcriptEl.scrollHeight - transcriptEl.clientHeight;
-      // Already at the bottom of the transcript; nothing to scroll to.
-      if (transcriptEl.scrollTop >= maxScrollTop - 1) return;
-      const desired =
-        transcriptEl.scrollTop + wordTopInViewport - containerRect.height * SNAP_TARGET_FRACTION;
-      const target = Math.min(desired, maxScrollTop);
-      smoothScrollTo(target, SNAP_DURATION_MS);
+    const maxScrollTop = transcriptEl.scrollHeight - transcriptEl.clientHeight;
+    if (transcriptEl.scrollTop >= maxScrollTop - 1) return;
+    const desired =
+      transcriptEl.scrollTop + wordTopInViewport - containerRect.height * SNAP_TARGET_FRACTION;
+    const target = Math.max(0, Math.min(desired, maxScrollTop));
+    smoothScrollTo(target, SNAP_DURATION_MS);
+  }
+
+  // Drift auto-scroll: on every current-word change, if the active word has
+  // drifted past the top zone, snap it back near the top.
+  $effect(() => {
+    void currentWordIdx;
+    if (!autoScroll || !transcriptEl || currentWordIdx < 0) return;
+    const wordEl = transcriptEl.querySelector('.current-word') as HTMLElement | null;
+    if (!wordEl) return;
+    const containerRect = transcriptEl.getBoundingClientRect();
+    const wordTopInViewport = wordEl.getBoundingClientRect().top - containerRect.top;
+    if (wordTopInViewport > containerRect.height * TOP_ZONE_FRACTION) {
+      snapCurrentWordToTop();
     }
+  });
+
+  // Force-snap: when the parent signals a seek or autoscroll re-enable,
+  // scroll the current word to near the top unconditionally.
+  $effect(() => {
+    void forceSnapToken;
+    if (!autoScroll || currentWordIdx < 0) return;
+    requestAnimationFrame(snapCurrentWordToTop);
   });
 
   function disableAutoScroll() {

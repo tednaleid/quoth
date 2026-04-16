@@ -8,6 +8,7 @@
   import { SettingsStorage } from '../../adapters/browser/settings-storage';
   import { DEFAULT_SETTINGS, hexToRgbString, type HighlightSettings } from '../../core/settings';
   import type { ContentMessage, SidePanelMessage } from '../../messages';
+  import { isSeek } from '../../core/seek-detector';
   import Header from '../sidepanel/components/Header.svelte';
   import SettingsPanel from '../sidepanel/components/SettingsPanel.svelte';
   import StatusBar from '../sidepanel/components/StatusBar.svelte';
@@ -23,6 +24,8 @@
   let disconnected = $state(false);
   let settings: HighlightSettings = $state({ ...DEFAULT_SETTINGS });
   let settingsOpen = $state(false);
+  let lastTimeMs: number | null = $state(null);
+  let forceSnapToken = $state(0);
 
   const settingsStorage = new SettingsStorage(browser.storage.local);
   settingsStorage
@@ -45,6 +48,16 @@
   browser.runtime.onMessage.addListener((message: ContentMessage, sender) => {
     if (sender.tab?.id && sender.tab.id === pinnedTabId) {
       if (disconnected && message.type === 'time-update') return;
+      if (message.type === 'video-detected' || message.type === 'video-left') {
+        lastTimeMs = null;
+      }
+      if (message.type === 'time-update') {
+        if (isSeek(lastTimeMs, message.currentTimeMs)) {
+          autoScroll = true;
+          forceSnapToken++;
+        }
+        lastTimeMs = message.currentTimeMs;
+      }
       state = handleMessage(state, message);
     }
   });
@@ -62,8 +75,8 @@
     if (!disconnected) {
       sendToTab(pinnedTabId, { type: 'seek-to', timeMs });
     }
-    // Click-to-seek re-enables auto-scroll so the panel follows the new location.
     autoScroll = true;
+    forceSnapToken++;
   }
 
   setupPinnedTabConnector(pinnedTabId, {
@@ -94,7 +107,10 @@
   <Header
     title={state.videoInfo?.title ?? ''}
     {autoScroll}
-    onToggleAutoScroll={() => (autoScroll = !autoScroll)}
+    onToggleAutoScroll={() => {
+      autoScroll = !autoScroll;
+      if (autoScroll) forceSnapToken++;
+    }}
     settingsOpen
     onToggleSettings={() => (settingsOpen = !settingsOpen)}
     {disconnected}
@@ -109,6 +125,7 @@
       currentTimeMs={state.currentTimeMs}
       chapters={state.chapters}
       {autoScroll}
+      {forceSnapToken}
       videoId={state.videoInfo?.videoId ?? ''}
       peakCap={settings.peakCap}
       horizonSeconds={settings.horizonSeconds}
