@@ -1,18 +1,57 @@
 # Store Registration Walkthrough
 
 Step-by-step guide for the manual parts of getting Quoth onto Firefox
-Add-ons (AMO) and the Chrome Web Store. Once both stores are live, the
-release pipeline (`.github/workflows/release.yml`) takes over.
+Add-ons (AMO) and the Chrome Web Store.
 
-Before starting, generate the assets and have these tabs open:
+## Status (2026-04-25)
+
+| | Status |
+|---|---|
+| Part A: AMO listing submitted (v0.2.1) | DONE -- awaiting Mozilla review |
+| Part B: Chrome Web Store listing submitted (v0.1.10) | DONE -- awaiting Google review |
+| Part C: `release.yml` flipped to AMO listed + Chrome Web Store auto-publish | DONE -- activates on next tag push |
+| Secrets: `WEB_EXT_API_KEY`, `WEB_EXT_API_SECRET`, `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`, `CHROME_REFRESH_TOKEN` | DONE -- all six set on GitHub |
+
+## What's left
+
+1. Wait for both review emails (Mozilla typically 1-7 days, Google 3-7 days for first listings with host permissions).
+2. **If reviewers ask follow-up questions** -- log into the respective dashboard and respond. Quoth's privacy notice and reviewer notes are designed to preempt the common asks (no remote code, no data collection, Svelte innerHTML is framework-internal).
+3. **Once both first listings are approved:**
+   ```
+   just bump 0.2.2
+   ```
+   That tags + pushes, CI fires, both stores receive v0.2.2 automatically. Follow-up versions auto-approve fast on AMO (minutes); Chrome Web Store still queues each version for review (hours-to-days).
+4. **Don't `just bump` before both first listings are approved.** A new version racing the in-review one creates churn -- the in-review one gets superseded or both end up in queue.
+
+After v0.2.2 ships and both stores publish:
+
+- Update `README.md` to link to the public AMO listing
+  (`https://addons.mozilla.org/firefox/addon/quoth/`) and Chrome Web
+  Store listing (URL becomes available after Google publishes).
+- Optional: investigate narrowing permissions in v0.2.3 (drop `tabs`,
+  narrow `host_permissions` to `https://www.youtube.com/*`).
+- Optional: build a 440x280 small promo tile if you want Chrome Web
+  Store "Featured" eligibility.
+
+---
+
+## Reference: how this was built (preserved for re-running on a fork or next project)
+
+The rest of this document captures the manual setup steps in case
+someone needs to re-create the AMO listing, the Chrome Web Store
+listing, or the Google Cloud OAuth wiring. Skip if you're just
+operating an already-set-up release pipeline.
+
+Before starting, have these tabs open:
 
 - `docs/spec/store-listings.md` (copy/paste source for every text field)
 - `docs/spec/privacy.md` (link target for the privacy URL)
 - `assets/store/screenshots/` (six 1280x800 PNGs, three per browser, captured manually with `just dev <browser>` + `Cmd-Shift-4`)
 - `public/icon/128.png` (icon for both stores)
 
-Estimated time: 90 minutes for AMO, 90 minutes for Chrome Web Store. Most
-of it is filling forms; the OAuth dance for Chrome takes ~10 minutes.
+Estimated time on a fresh repo: 90 minutes for AMO, 90 minutes for
+Chrome Web Store. Most of it is filling forms; the OAuth dance for
+Chrome takes ~10 minutes.
 
 ---
 
@@ -173,8 +212,8 @@ Use `docs/spec/store-listings.md` for every field.
   - Language: English (United States)
   - Icon: upload `public/icon/128.png`
   - Screenshots: upload `assets/store/screenshots/01-chrome-sidepanel.png`, `02-chrome-settings.png`, `03-chrome-popout.png`
-  - Small promo tile (440x280): required (TODO -- create manually)
-  - Marquee promo tile (1400x560): optional
+  - Small promo tile (440x280): optional, skip for now (icon is used as fallback)
+  - Marquee promo tile (1400x560): optional, skip for now
 - **Privacy practices tab**:
   - Single-purpose statement: copy from `store-listings.md`
   - Permission justifications: copy each row from `store-listings.md`

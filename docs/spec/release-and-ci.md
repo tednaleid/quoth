@@ -52,26 +52,24 @@ export WEB_EXT_API_SECRET="your-jwt-secret"     # the "JWT secret" value from AM
    - `WEB_EXT_API_KEY` = JWT issuer
    - `WEB_EXT_API_SECRET` = JWT secret
 
-The extension's AMO ID is already set in `wxt.config.ts` as
-`quoth@tednaleid.com`. This is used for self-hosted signing (not listed
-on AMO).
+The extension's AMO ID is set in `wxt.config.ts` as `quoth@tednaleid.com`.
 
-## Setup: Chrome Web Store (optional, for public distribution)
+## Public store distribution
 
-Only needed if you want to publish on the Chrome Web Store:
+Both stores are wired up. See
+[`store-registration-walkthrough.md`](./store-registration-walkthrough.md)
+for the one-time setup history and re-run instructions.
 
-1. Pay the one-time $5 developer registration fee at
-   https://chrome.google.com/webstore/devconsole/register
-2. Create a new extension in the developer console
-3. Set up API access following
-   https://developer.chrome.com/docs/webstore/using-api/ -- you'll need
-   a Google Cloud project with the Chrome Web Store API enabled, and an
-   OAuth2 client ID/secret
-4. Add GitHub secrets: `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`,
-   `CHROME_REFRESH_TOKEN`, `CHROME_EXTENSION_ID`
+- **AMO**: signed `--channel listed`, auto-publishes once the listing is
+  approved. Uses `WEB_EXT_API_KEY` / `WEB_EXT_API_SECRET`.
+- **Chrome Web Store**: uploaded and published via the Chrome Web Store
+  API. Uses `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`,
+  `CHROME_CLIENT_SECRET`, `CHROME_REFRESH_TOKEN`. The release.yml step
+  is gated on `CHROME_EXTENSION_ID` being set, so first releases without
+  Chrome creds skip the upload cleanly.
 
-This is not required for local use -- Chrome loads unpacked extensions
-without signing.
+`just setup-github-secrets` pushes the AMO pair from local env;
+`just setup-chrome-secrets` pushes the four Chrome ones.
 
 ## CI Pipeline
 
@@ -83,15 +81,15 @@ without signing.
 
 ### On version tags (`release.yml`)
 
-Triggered by pushing a version tag (e.g., `v0.1.0`):
+Triggered by pushing a version tag (e.g., `v0.2.2`):
 
-1. Run full checks
-2. Build and zip both browsers
-3. Sign the Firefox extension via AMO (`web-ext sign`)
-4. Create a GitHub Release with:
-   - Signed Firefox .xpi
-   - Chrome .zip (for manual Chrome Web Store upload or sideloading)
-   - Auto-generated release notes from commit history
+1. Build and zip both browsers
+2. Build a `git archive` source zip (for AMO source-code requests)
+3. Sign Firefox `--channel listed` via `web-ext sign` -> uploads to AMO
+4. Create GitHub Release with chrome.zip, firefox.zip, signed `.xpi`
+5. Detect Chrome Web Store secrets; if present, upload the chrome.zip
+   to the Chrome Web Store via `curl` against the CWS API and call
+   `/publish`
 
 ## Versioning
 
