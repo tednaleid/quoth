@@ -8,6 +8,12 @@ const chromiumProfilePath = resolve('.wxt/profiles/chrome');
 mkdirSync(firefoxProfilePath, { recursive: true });
 mkdirSync(chromiumProfilePath, { recursive: true });
 
+// Optional fixed window size for screenshot captures (Chromium honors this; Firefox does not).
+const winW = process.env.QUOTH_WINDOW_WIDTH;
+const winH = process.env.QUOTH_WINDOW_HEIGHT;
+const chromiumArgs =
+  winW && winH ? [`--window-size=${winW},${winH}`, '--window-position=0,0'] : undefined;
+
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-svelte'],
@@ -16,6 +22,7 @@ export default defineConfig({
     firefoxProfile: firefoxProfilePath,
     chromiumProfile: chromiumProfilePath,
     keepProfileChanges: true,
+    chromiumArgs,
   },
   manifest: {
     name: 'Quoth',

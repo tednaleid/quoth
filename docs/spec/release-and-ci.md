@@ -2,6 +2,14 @@
 
 How to build, sign, install, and release the Quoth browser extension.
 
+For the public-store path (AMO listing + Chrome Web Store), see:
+
+- [`store-listings.md`](./store-listings.md) -- canonical listing copy, asset
+  checklist, permission justifications
+- [`privacy.md`](./privacy.md) -- privacy notice both stores require
+- [`store-registration-walkthrough.md`](./store-registration-walkthrough.md)
+  -- step-by-step manual registration for both stores
+
 ## Quick Start: Install Locally
 
 ### Firefox (primary)

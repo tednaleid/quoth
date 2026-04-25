@@ -54,14 +54,35 @@ typecheck *ARGS:
 build BROWSER="firefox":
     bunx wxt build --browser {{BROWSER}}
 
-# Start dev mode with HMR (default: firefox, optionally open a URL: just dev firefox 'https://youtube.com/watch?v=...')
-# Note: URL with ? or & must be quoted in the shell
-dev BROWSER="firefox" URL="":
-    QUOTH_START_URL={{URL}} bunx wxt --browser {{BROWSER}}
+# Start dev mode with HMR. Defaults: firefox, no URL, 1280x800 window.
+# URL with ? or & must be quoted in the shell.
+# Chrome honors window size at launch; Firefox is resized post-launch via osascript
+# (needs Accessibility permission; resize manually if it doesn't take).
+dev BROWSER="firefox" URL="" WIDTH="1280" HEIGHT="800":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    width="{{WIDTH}}"
+    height="{{HEIGHT}}"
+    if [ "{{BROWSER}}" = "firefox" ]; then
+        QUOTH_START_URL="{{URL}}" bunx wxt --browser firefox &
+        wxt_pid=$!
+        (
+            sleep 8
+            osascript \
+                -e 'tell application "Firefox" to activate' \
+                -e "tell application \"System Events\" to tell process \"Firefox\" to set position of front window to {0, 0}" \
+                -e "tell application \"System Events\" to tell process \"Firefox\" to set size of front window to {$width, $height}" \
+                2>/dev/null \
+              || echo "(Firefox resize via osascript needs Accessibility permission; resize manually if needed.)"
+        ) &
+        wait $wxt_pid
+    else
+        QUOTH_START_URL="{{URL}}" QUOTH_WINDOW_WIDTH="$width" QUOTH_WINDOW_HEIGHT="$height" bunx wxt --browser {{BROWSER}}
+    fi
 
 # Start dev mode for popout tab (right-click extension icon -> "Open in new tab")
-dev-popout BROWSER="firefox" URL="":
-    QUOTH_START_URL={{URL}} bunx wxt --browser {{BROWSER}}
+dev-popout BROWSER="firefox" URL="" WIDTH="1280" HEIGHT="800":
+    just dev {{BROWSER}} {{URL}} {{WIDTH}} {{HEIGHT}}
 
 # Clean build artifacts and caches (also clears dev browser profiles)
 clean:
@@ -152,6 +173,52 @@ setup-github-secrets:
     gh secret set WEB_EXT_API_KEY --body "$WEB_EXT_API_KEY"
     gh secret set WEB_EXT_API_SECRET --body "$WEB_EXT_API_SECRET"
     echo "GitHub secrets set successfully."
+
+# Run the OAuth loopback flow to obtain a Chrome Web Store refresh token.
+# Requires CHROME_CLIENT_ID and CHROME_CLIENT_SECRET (from Google Cloud Console OAuth Desktop client).
+chrome-store-refresh-token:
+    bun run tools/get-cws-refresh-token.ts
+
+# Push Chrome Web Store API credentials from env to GitHub repository secrets.
+# Requires CHROME_EXTENSION_ID, CHROME_CLIENT_ID, CHROME_CLIENT_SECRET, CHROME_REFRESH_TOKEN.
+setup-chrome-secrets:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for var in CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN; do
+        if [ -z "${!var:-}" ]; then
+            echo "Error: $var must be set in your environment"
+            exit 1
+        fi
+    done
+    gh secret set CHROME_EXTENSION_ID --body "$CHROME_EXTENSION_ID"
+    gh secret set CHROME_CLIENT_ID --body "$CHROME_CLIENT_ID"
+    gh secret set CHROME_CLIENT_SECRET --body "$CHROME_CLIENT_SECRET"
+    gh secret set CHROME_REFRESH_TOKEN --body "$CHROME_REFRESH_TOKEN"
+    echo "Chrome Web Store secrets set successfully."
+
+# Build Chrome extension and capture store-quality screenshots into assets/store/screenshots/.
+# Optional URL arg overrides the default transcript-rich video.
+screenshots *URL:
+    just build chrome
+    bun run tools/screenshot-chrome.ts {{URL}}
+
+# Resize every PNG in assets/store/screenshots/ to exactly 1280x800 (Chrome Web Store strict).
+# Use after taking manual screenshots on a HiDPI display (capture comes out 2560x1600).
+normalize-screenshots:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd assets/store/screenshots
+    shopt -s nullglob
+    files=(*.png)
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "No PNGs in assets/store/screenshots/"
+        exit 0
+    fi
+    for f in "${files[@]}"; do
+        echo "Normalizing $f..."
+        magick "$f" -resize 1280x800^ -gravity center -extent 1280x800 "$f"
+    done
+    magick identify "${files[@]}"
 
 # Bump version, commit, tag with release notes, and push.
 # Usage: just bump 0.1.0 (or just bump for patch increment)
