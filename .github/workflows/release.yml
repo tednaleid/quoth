@@ -33,11 +33,17 @@ jobs:
       - name: Build and zip Firefox extension
         run: bunx wxt zip -b firefox
 
-      - name: Sign Firefox extension
+      - name: Build source archive (for AMO listed reviewers)
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          git archive --format=zip --output="/tmp/quoth-source-${version}.zip" HEAD
+          ls -lh "/tmp/quoth-source-${version}.zip"
+
+      - name: Sign Firefox extension (AMO listed)
         env:
           WEB_EXT_API_KEY: ${{ secrets.WEB_EXT_API_KEY }}
           WEB_EXT_API_SECRET: ${{ secrets.WEB_EXT_API_SECRET }}
-        run: bunx web-ext sign --source-dir .output/firefox-mv2 --artifacts-dir .output/signed --channel unlisted
+        run: bunx web-ext sign --source-dir .output/firefox-mv2 --artifacts-dir .output/signed --channel listed
 
       - name: Ensure annotated tag is available
         run: git fetch origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}" --force
@@ -52,3 +58,36 @@ jobs:
             .output/*-chrome.zip \
             .output/*-firefox.zip \
             .output/signed/*.xpi
+
+      - name: Detect Chrome Web Store secrets
+        id: cws_check
+        env:
+          EID: ${{ secrets.CHROME_EXTENSION_ID }}
+        run: |
+          if [ -n "${EID:-}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Chrome Web Store secrets not set; skipping CWS upload."
+          fi
+
+      - name: Upload to Chrome Web Store
+        if: steps.cws_check.outputs.configured == 'true'
+        env:
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          chrome_zip=".output/quoth-${version}-chrome.zip"
+          access_token=$(curl -sSf -X POST -d \
+            "client_id=${CHROME_CLIENT_ID}&client_secret=${CHROME_CLIENT_SECRET}&refresh_token=${CHROME_REFRESH_TOKEN}&grant_type=refresh_token" \
+            https://oauth2.googleapis.com/token | jq -r .access_token)
+          curl -sSf -H "Authorization: Bearer ${access_token}" -H "x-goog-api-version: 2" \
+            -X PUT -T "${chrome_zip}" \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}"
+          curl -sSf -H "Authorization: Bearer ${access_token}" -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0" -X POST \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}/publish"
