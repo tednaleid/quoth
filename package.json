@@ -2,7 +2,7 @@
   "name": "quoth",
   "description": "YouTube transcript viewer with client-side formatting",
   "private": true,
-  "version": "0.1.11",
+  "version": "0.2.2",
   "type": "module",
   "scripts": {
     "dev": "wxt",
