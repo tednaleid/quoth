@@ -8,7 +8,7 @@ import { extractVideoId } from '../core/youtube';
 import type { ContentMessage, SidePanelMessage } from '../messages';
 
 export default defineContentScript({
-  matches: ['*://*.youtube.com/watch*'],
+  matches: ['*://*.youtube.com/*'],
   main() {
     // Expose extension URL on the DOM so Playwright smoke tests can discover it
     document.documentElement.dataset.quothExtUrl = browser.runtime.getURL('/');

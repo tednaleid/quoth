@@ -4,7 +4,7 @@
  */
 
 export default defineContentScript({
-  matches: ['*://*.youtube.com/watch*'],
+  matches: ['*://*.youtube.com/*'],
   world: 'MAIN',
   main() {
     window.addEventListener('message', (event) => {
