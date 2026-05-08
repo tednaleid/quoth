@@ -167,6 +167,27 @@ Privacy & permissions
 Happy to clarify anything; the GitHub issues link is in the support URL field.
 ```
 
+## CWS "Test instructions -> Additional instructions" field (500 char limit)
+
+Lives in CWS Dev Dashboard -> Quoth -> Access -> Test instructions ->
+Additional instructions. Plain text, replaces the whole field. Trim the
+rejection-specific paragraph after the next clean review so we don't
+keep referencing stale rejections.
+
+```
+v0.2.2 fixes prior rejection (Red Potassium). Match pattern broadened
+to *://*.youtube.com/* so the script loads on any YouTube page and
+handles SPA navigations to /watch.
+
+Please verify both test paths:
+A) Direct: load https://www.youtube.com/watch?v=YwZR6tc7qYg, click the
+   Quoth toolbar icon -> transcript loads; click a word to seek.
+B) SPA: load https://www.youtube.com/ first, then click any video tile
+   -> same behavior.
+
+All processing is client-side. No analytics, no telemetry.
+```
+
 ## When to update this doc
 
 - Permission added or removed -> update the table here, then `wxt.config.ts`
