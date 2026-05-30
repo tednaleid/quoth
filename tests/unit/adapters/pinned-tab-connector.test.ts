@@ -26,7 +26,7 @@ function tabInfo(id: number, url: string) {
 
 describe('setupPinnedTabConnector - initial connection', () => {
   it('calls onConnect immediately with the pinned tabId', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();
@@ -39,7 +39,7 @@ describe('setupPinnedTabConnector - initial connection', () => {
   });
 
   it('sends request-state via sendMessage on connect', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();
@@ -55,7 +55,7 @@ describe('setupPinnedTabConnector - initial connection', () => {
 
 describe('setupPinnedTabConnector - tab closed', () => {
   it('calls onDisconnect with tab-closed when pinned tab is removed', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();
@@ -70,8 +70,8 @@ describe('setupPinnedTabConnector - tab closed', () => {
   });
 
   it('does not call onDisconnect when a different tab is removed', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
-    await fakeBrowser.tabs.create({ id: 10, url: 'https://www.example.com/' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.example.com/' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();
@@ -87,7 +87,7 @@ describe('setupPinnedTabConnector - tab closed', () => {
 
 describe('setupPinnedTabConnector - navigated away', () => {
   it('calls onDisconnect when pinned tab navigates to a non-YouTube URL', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();
@@ -106,7 +106,7 @@ describe('setupPinnedTabConnector - navigated away', () => {
   });
 
   it('does not call onDisconnect when pinned tab navigates to a different YouTube video', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();
@@ -124,8 +124,8 @@ describe('setupPinnedTabConnector - navigated away', () => {
   });
 
   it('does not call onDisconnect when a different tab navigates away', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
-    await fakeBrowser.tabs.create({ id: 10, url: 'https://www.youtube.com/watch?v=xyz' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=xyz' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();
@@ -143,7 +143,7 @@ describe('setupPinnedTabConnector - navigated away', () => {
   });
 
   it('ignores onUpdated events without a URL change', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();
@@ -164,7 +164,7 @@ describe('setupPinnedTabConnector - navigated away', () => {
 
 describe('setupPinnedTabConnector - cleanup', () => {
   it('stops listening for tab removal after cleanup', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();
@@ -178,7 +178,7 @@ describe('setupPinnedTabConnector - cleanup', () => {
   });
 
   it('stops listening for tab URL changes after cleanup', async () => {
-    await fakeBrowser.tabs.create({ id: 5, url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
 
     const onConnect = vi.fn();
     const onDisconnect = vi.fn();

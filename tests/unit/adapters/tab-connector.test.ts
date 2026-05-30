@@ -13,7 +13,6 @@ beforeEach(() => {
 describe('setupTabConnector - initial connection', () => {
   it('connects to the first YouTube tab found', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.youtube.com/watch?v=abc',
     });
 
@@ -28,11 +27,9 @@ describe('setupTabConnector - initial connection', () => {
 
   it('ignores non-YouTube tabs when looking for initial connection', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.example.com/',
     });
     await fakeBrowser.tabs.create({
-      id: 2,
       url: 'https://www.youtube.com/watch?v=xyz',
     });
 
@@ -47,7 +44,6 @@ describe('setupTabConnector - initial connection', () => {
 
   it('does not call onConnect when no YouTube tabs exist', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.example.com/',
     });
 
@@ -90,7 +86,6 @@ describe('setupTabConnector - tab switching', () => {
 
   it('does not call onConnect when user activates a non-YouTube tab', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.example.com/',
     });
 
@@ -108,7 +103,6 @@ describe('setupTabConnector - tab switching', () => {
 
   it('does not call onConnect again when switching to the already-connected tab', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.youtube.com/watch?v=abc',
     });
 
@@ -129,11 +123,9 @@ describe('setupTabConnector - tab switching', () => {
 
   it('calls onConnect when switching from one YouTube tab to another', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.youtube.com/watch?v=abc',
     });
     await fakeBrowser.tabs.create({
-      id: 2,
       url: 'https://www.youtube.com/watch?v=xyz',
     });
 
@@ -158,7 +150,6 @@ describe('setupTabConnector - tab navigation (onUpdated)', () => {
   it('calls onConnect when an existing tab navigates to YouTube', async () => {
     // Start with a non-YouTube tab
     const tab = await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.example.com/',
     });
 
@@ -184,7 +175,6 @@ describe('setupTabConnector - tab navigation (onUpdated)', () => {
 
   it('does not call onConnect when a tab navigates away from YouTube', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.youtube.com/watch?v=abc',
     });
 
@@ -209,7 +199,6 @@ describe('setupTabConnector - tab navigation (onUpdated)', () => {
 describe('setupTabConnector - cleanup', () => {
   it('stops listening for tab activation after cleanup', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.youtube.com/watch?v=abc',
     });
 
@@ -228,7 +217,6 @@ describe('setupTabConnector - cleanup', () => {
 describe('setupTabConnector - sendMessage', () => {
   it('calls sendMessage on initial connect', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.youtube.com/watch?v=abc',
     });
 
@@ -244,7 +232,6 @@ describe('setupTabConnector - sendMessage', () => {
 
   it('calls sendMessage on tab switch', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.youtube.com/watch?v=abc',
     });
 
@@ -264,11 +251,9 @@ describe('setupTabConnector - sendMessage', () => {
 
   it('calls sendMessage when switching to a different YouTube tab', async () => {
     await fakeBrowser.tabs.create({
-      id: 1,
       url: 'https://www.youtube.com/watch?v=abc',
     });
     await fakeBrowser.tabs.create({
-      id: 2,
       url: 'https://www.youtube.com/watch?v=xyz',
     });
 
