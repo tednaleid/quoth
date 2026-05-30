@@ -101,7 +101,7 @@ arg = "wxt"
 id = "use-just-e2e-playwright"
 name = "Redirect playwright to just test-e2e"
 action = "reject"
-message = "Use `just test-e2e` instead of running playwright directly. It builds Chrome first."
+message = "Use `just test-e2e` instead of running playwright directly (it builds Chrome first), or `just install-browsers` to download the browser binary."
 [rule.match]
 command = "playwright"
 
@@ -109,7 +109,7 @@ command = "playwright"
 id = "use-just-e2e-bunx-playwright"
 name = "Redirect bunx playwright to just test-e2e"
 action = "reject"
-message = "Use `just test-e2e` instead of running playwright via bunx. It builds Chrome first."
+message = "Use `just test-e2e` instead of running playwright via bunx (it builds Chrome first), or `just install-browsers` to download the browser binary."
 [rule.match]
 command = "bunx"
 arg = "playwright"
