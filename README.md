@@ -9,11 +9,22 @@ alongside the YouTube page.
 
 ## Install
 
-### Firefox
+Install Quoth from your browser's official extension store:
 
-Signed builds are published to
-[GitHub Releases](https://github.com/tednaleid/quoth/releases). If you have
-this repo cloned with [`just`](https://github.com/casey/just) and
+- **Chrome:** [Chrome Web Store](https://chromewebstore.google.com/detail/quoth/gmhblbmmgbhmbanacbdikjpephmdkeab)
+- **Firefox:** [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/quoth/)
+
+These are the recommended way to install Quoth. The store handles updates
+automatically.
+
+### Manual install from GitHub Releases
+
+If you prefer to install builds directly from
+[GitHub Releases](https://github.com/tednaleid/quoth/releases):
+
+#### Firefox
+
+If you have this repo cloned with [`just`](https://github.com/casey/just) and
 [`gh`](https://cli.github.com/) installed, the fastest way to install the
 latest release is:
 
@@ -27,7 +38,7 @@ Firefox, which prompts you to install it permanently.
 Otherwise, download the `.xpi` manually from the latest release and either
 double-click it or drag it into Firefox's `about:addons` page.
 
-### Chrome
+#### Chrome
 
 1. Download `quoth-<version>-chrome.zip` from
    [the latest release](https://github.com/tednaleid/quoth/releases) and
