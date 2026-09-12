@@ -5,7 +5,9 @@ transcripts alongside YouTube videos. Everything runs client-side -- no server,
 no accounts, no data leaves your browser.
 
 Works in Chrome and Firefox. The transcript displays in a sidebar docked
-alongside the YouTube page.
+alongside the YouTube page. Click any word to seek, pick which open YouTube
+tab the sidebar follows, and copy the transcript as plain text, with
+timestamps, or as markdown with chapter headings and timestamp links.
 
 ## Install
 
@@ -60,6 +62,7 @@ Quoth requests only the permissions it needs, all scoped to youtube.com.
 | `tabs` | Queries open tabs to find YouTube videos and sends messages between the sidebar and content scripts running on YouTube. |
 | `storage` | Caches parsed transcripts locally (keyed by video ID) so repeat visits load instantly without re-fetching from YouTube. |
 | `unlimitedStorage` | Extends the default 5 MB storage quota. A single transcript is small (~200 KB), but users who watch many videos benefit from a larger cache. |
+| `contextMenus` | Adds a right-click entry on the toolbar icon to open the transcript in its own tab. |
 
 ### What Quoth does NOT do
 
@@ -71,4 +74,4 @@ Quoth requests only the permissions it needs, all scoped to youtube.com.
 
 ## Development
 
-See `CLAUDE.md` for build commands, architecture, and development conventions.
+See `ONBOARDING.md` for build commands, architecture, and development conventions.

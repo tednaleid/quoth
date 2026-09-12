@@ -33,20 +33,3 @@ YouTube needs for seeking. Switching away from WXT dev mode would lose HMR.
 **Status:** Not blocking development (Firefox is the primary target).
 Revisit if/when we want Chrome dev mode to be seamless.
 
----
-
-## WXT type gaps for browser sidebar APIs
-
-**Environment:** All builds.
-
-**Symptoms:** `@ts-expect-error` comments appear in:
-- `src/adapters/chrome/sidebar-host.ts` -- `chrome.sidePanel` not in WXT types
-- `src/adapters/firefox/sidebar-host.ts` -- `browser.sidebarAction` not in WXT types
-
-**Root cause:** WXT's type definitions lag behind browser extension APIs.
-Tracked upstream at wxt-dev/wxt#1256 and wxt-dev/wxt#1652.
-
-**Workaround:** `@ts-expect-error` comments with explanation. Will be
-removed once WXT publishes updated types.
-
-**Status:** Cosmetic. Compiles and runs correctly.

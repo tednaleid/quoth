@@ -24,6 +24,8 @@ the browser.
 - Build: `just build [firefox|chrome]` (default: firefox)
 - Dev mode (HMR): `just dev [firefox|chrome] '<url>'` (URL must be quoted)
 - Debug Firefox logs: `just debug-firefox '<url>'`
+- Store screenshots: `just store-screenshots [chrome|firefox|all]` (real docked sidebar, needs Screen Recording + Accessibility permission)
+- Design-review screenshots: `just screenshots` (Chrome tab-based captures)
 - Release: `just bump [version]`, re-trigger via `just retag <version>`
 - Install hooks: `just install-hooks` (pre-commit runs `just check`)
 

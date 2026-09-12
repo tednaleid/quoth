@@ -274,13 +274,12 @@ graph TB
 
 ### How tab mode works
 
-The side panel app finds the YouTube tab via the `TabConnector` port, which
-queries for matching URLs:
-
-```typescript
-const [ytTab] = await browser.tabs.query({ active: true });
-// Falls back to any YouTube tab if active tab isn't YouTube
-```
+The side panel app connects to a YouTube tab through the `TabConnector`
+port. The connector owns the connected tab and the follow/pin mode: in
+follow mode it tracks the active YouTube tab (falling back to any open one),
+and a pinned tab stays connected until it closes. It reports the list of
+open YouTube tabs for the header menu and a disconnect reason when the
+connected tab goes away.
 
 This works identically whether the app runs as a browser sidebar or as a
 standalone tab. The content script on the YouTube page doesn't know or care

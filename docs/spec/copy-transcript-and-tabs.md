@@ -12,7 +12,7 @@ plain click must seek while a drag-select must not. There is no separate
 "copy mode": auto-scroll has its own toggle, and the highlight never blocks
 selection.
 
-- `src/core/click-guard.ts` — pure `shouldSeekOnClick(down, up,
+- `src/core/click-guard.ts` -- pure `shouldSeekOnClick(down, up,
   selectionCollapsed)`: a click seeks only if the pointer moved 5px or less
   and no text is selected. The component records the `mousedown` position and
   reads `window.getSelection()` at click time; only the boolean crosses into
@@ -36,15 +36,15 @@ selection. The same copy flow and toast are shared with the popout page via
 Formats (paragraphs joined by blank lines), all pure functions in
 `src/core/transcript-export.ts`:
 
-- **Markdown** (default) — the document format from `docs/spec/design.md`:
+- **Markdown** -- the document format from `docs/spec/design.md`:
   a `#` title, a `[Video](url) | channel | duration` line, chapters as `##`
   headings, and each paragraph prefixed with a clickable timestamp link:
   `[1:01](https://youtube.com/watch?v=abc123&t=61) Second para.` Paragraphs
   are not hard-wrapped, since Obsidian renders single newlines as breaks.
   Chapter placement uses the same `assignChaptersToSegments` helper as the
   sidebar, so the export and the view agree on where a chapter begins.
-- **Timestamps** — plain `[1:01] Second para.` (also `[h:mm:ss]` past an hour).
-- **Plain** — paragraph text only, no timestamps.
+- **Timestamps** -- plain `[1:01] Second para.` (also `[h:mm:ss]` past an hour).
+- **Plain** -- paragraph text only, no timestamps.
 
 Clipboard path (`src/adapters/browser/clipboard.ts`, keeping browser APIs in
 adapters per the hexagonal layout):
@@ -77,11 +77,11 @@ edge of the header, so a tab can be pinned before a second one is opened.
 
 Wiring:
 
-- `src/ports/tab-connector.ts` — `YouTubeTabInfo { id, title, url, active }`,
+- `src/ports/tab-connector.ts` -- `YouTubeTabInfo { id, title, url, active }`,
   optional `onTabsChanged(tabs)` and `onDisconnect(reason)` callbacks, and a
   `TabConnection` handle (`pin(tabId)`, `follow()`, `cleanup()`) returned by
   `setupTabConnector`.
-- `src/adapters/browser/tab-connector.ts` — the connector is the single owner
+- `src/adapters/browser/tab-connector.ts` -- the connector is the single owner
   of which tab is connected and whether it is following the active tab.
   `listYouTubeTabs()` queries all tabs and filters by the watch-URL regex (no
   new permissions needed since `tabs` + youtube host permissions already
@@ -93,8 +93,8 @@ Wiring:
   YouTube tab or reports `no-tabs`; a pinned connector reports
   `pinned-tab-closed` and waits. Every connection goes through the same
   `onConnect` + `request-state` path, so the content script refetches (or
-  replays — see §4).
-- `src/entrypoints/sidepanel/components/Header.svelte` — renders the pin
+  replays -- see §4).
+- `src/entrypoints/sidepanel/components/Header.svelte` -- renders the pin
   button and the title dropdown (a `Menu.svelte` in its title variant)
   whenever it is given the pin and select callbacks. `App.svelte` mirrors
   `availableTabs` and `youtubeTabId` from the connector callbacks, keeps
@@ -106,7 +106,7 @@ Wiring:
 
 **Problem:** every switch sent `request-state`, and the content script answered
 by resetting `currentVideoId` and refetching all three network calls
-(metadata POST, transcript GET, chapters POST) — even when returning to a tab
+(metadata POST, transcript GET, chapters POST) -- even when returning to a tab
 loaded seconds earlier.
 
 **Fix (`src/entrypoints/content.ts`):** the content script keeps its last
@@ -120,13 +120,13 @@ the next `request-state` instead of replaying forever. On `request-state`:
 
 The replay decision is the pure `shouldReplayCached()` helper in
 `src/core/replay.ts` (unit-tested). First visit to a tab still costs the three
-requests — unavoidable — but every return visit is instant. Time-update polling
+requests -- unavoidable -- but every return visit is instant. Time-update polling
 is untouched and keeps running across replays.
 
 **Not done:** the dormant `CacheStore` port + `ChromeStorageLocalCache`
 adapter (parsed transcripts keyed by videoId, never wired in) could persist
 transcripts across tabs for stale-while-revalidate on fresh tabs. Left out
-deliberately — caption track URLs expire, so it needs staleness handling — but
+deliberately -- caption track URLs expire, so it needs staleness handling -- but
 it is the natural next step.
 
 ## 5. Testing
@@ -139,7 +139,7 @@ it is the natural next step.
   settings + settings-storage migration (old saves gain `mode`/`copyFormat`
   defaults).
 - **Smoke:** `just smoke-test firefox` (sidepanel + popout mount in Gecko;
-  required a harness fix — the browser-API stub lacked `storage`, so the app
+  required a harness fix -- the browser-API stub lacked `storage`, so the app
   never mounted; stub added in `tools/smoke-test-firefox.ts`) and
   `just smoke-test` / `test-e2e` on Chromium (real extension, transcript load,
   exact-ms click-to-seek, popout).

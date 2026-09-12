@@ -4,7 +4,9 @@ Date: 2026-04-04
 
 ## Overview
 
-Quoth is a Chrome browser extension (Firefox next) that displays a formatted, searchable transcript in the browser's native side panel alongside YouTube videos. All processing happens client-side using ML models running via Transformers.js v4 in Web Workers. No server component.
+Quoth is a Chrome and Firefox browser extension that displays a formatted, searchable transcript in the browser's native side panel alongside YouTube videos. All processing happens client-side. No server component.
+
+**Scope note:** The original design included an ML formatting pipeline (punctuation, paragraph segmentation, and generated section headers running in Transformers.js). That pipeline was dropped. Paragraph breaks come from caption timing (see `paragraph-segmentation.md`), headings come from YouTube's chapter markers, and the ML research is kept in `other-research.md`. For the header, copy menu, and tab picker as built, see `copy-transcript-and-tabs.md`; for the code layout as built, see `architecture.md`.
 
 **Stack:** WXT framework + Svelte 5 + TypeScript + bun. Vitest for unit tests, Playwright for E2E.
 
@@ -22,11 +24,11 @@ All browser-specific and external dependencies are pushed to the edges. Core log
                          +--------------------------------------+
                          |            Quoth Core                 |
                          |                                       |
-   PageDetector -------->|  - Orchestrate progressive pipeline   |<---- TranscriptSource
+   PageDetector -------->|  - Parse captions into timed words    |<---- TranscriptSource
                          |  - Sync transcript with playback      |
-   VideoPlayer <-------->|  - Search within transcript           |<---- TranscriptFormatter
+   VideoPlayer <-------->|  - Search within transcript           |
                          |  - Export to markdown with timestamps  |
-   SidebarHost <---------|  - Manage formatting state/progress   |<---- TranscriptStore
+   SidebarHost <---------|  - Group words into paragraphs        |<---- TranscriptStore
                          |                                       |
                          +--------------------------------------+
 ```
@@ -37,8 +39,7 @@ All browser-specific and external dependencies are pushed to the edges. Core log
 |-----------|---------|------|
 | Content script | YouTube page (isolated world) | Extracts captions via Innertube API (JSON3 format), observes video playback state, handles click-to-seek |
 | Background service worker | Extension context | Routes messages between content script and side panel, manages extension lifecycle |
-| Side panel (Svelte 5) | Extension context | Displays transcript, handles search, manages export, shows processing status |
-| ML inference worker | Inside offscreen document (Chrome) | Runs Transformers.js v4 models via ONNX Runtime. Offscreen document required because Chrome MV3 service workers cannot access WebGPU or spawn persistent workers |
+| Side panel (Svelte 5) | Extension context | Displays transcript, handles search, copies and exports the transcript, shows status |
 
 ### Adapter Table
 
@@ -46,8 +47,7 @@ All browser-specific and external dependencies are pushed to the edges. Core log
 |------|-------------------|-------------------------|-------------|
 | `VideoPlayer` | Content script, YT player API, long-lived port | Same (content script is cross-browser) | `MockPlayerAdapter` (controllable time/events) |
 | `TranscriptSource` | Content script, Innertube JSON3 parsing | Same | `FixtureTranscriptAdapter` (saved JSON files) |
-| `TranscriptFormatter` | Offscreen document + Web Worker + Transformers.js v4 | Web Worker from sidebar/background page (no offscreen needed) | `PassthroughAdapter` / `MockFormatterAdapter` |
-| `TranscriptStore` | IndexedDB for transcripts, Cache API for models (`unlimitedStorage` permission) | Same | `InMemoryStoreAdapter` |
+| `TranscriptStore` | Extension local storage (`unlimitedStorage` permission) | Same | `InMemoryStoreAdapter` |
 | `SidebarHost` | Chrome sidePanel API | Firefox sidebar_action API | Vitest + happy-dom |
 | `PageDetector` | Content script, URL matching, `yt-navigate-finish` event | Same | `MockPageAdapter` |
 
@@ -55,25 +55,20 @@ All browser-specific and external dependencies are pushed to the edges. Core log
 
 1. User clicks extension icon on a YouTube page -- side panel opens
 2. `PageDetector` extracts video ID from URL
-3. `TranscriptStore` checks for cached formatted transcript in IndexedDB
+3. `TranscriptStore` checks for a cached transcript
 4. If not cached, `TranscriptSource` parses `ytInitialPlayerResponse` from the page, extracts caption track URL, fetches with `&fmt=json3` to get word-level timed segments
 5. Side panel immediately renders the raw transcript as word-level `<span>` elements (clickable, with start/end times)
-6. `TranscriptFormatter` progressively applies formatting tiers in the ML worker:
-   - Tier 1: Punctuation + true-casing + sentence boundary detection
-   - Tier 2: Paragraph segmentation (embedding similarity + timestamp gaps)
-   - Tier 3: Section header generation
-7. As each tier completes, `jsdiff` aligns the formatted text back to original word timestamps, and the side panel updates in-place (preserving scroll position and playback sync)
-8. `VideoPlayer` adapter in the content script sends current playback time via `chrome.runtime.connect` (long-lived port for streaming updates); side panel highlights the current sentence and auto-scrolls
-9. Formatted result is cached in `TranscriptStore` for next visit
-10. Status indicator at the bottom of the side panel shows current state (downloading models / processing tier N / done)
+6. Words are grouped into paragraphs from caption timing gaps, under YouTube chapter headings when the video has chapters
+7. `VideoPlayer` adapter in the content script sends current playback time via `chrome.runtime.connect` (long-lived port for streaming updates); side panel highlights the current sentence and auto-scrolls
+8. Transcript is cached in `TranscriptStore` for next visit
+9. Status bar at the bottom of the side panel shows loading and error state
 
 ### Key Technical Choices
 
 - **WXT framework** for build tooling, cross-browser manifests, dev HMR
-- **Svelte 5** (~1.85KB gzipped) for the side panel UI -- compile-time reactivity, scoped styles, near-zero runtime overhead. The sidebar needs reactive updates for progressive formatting, playback sync, and search, making vanilla DOM impractical.
-- **Transformers.js v4** for ONNX model inference in Web Workers
-- **Cache API** for ML model file caching (Transformers.js default); **IndexedDB** for formatted transcript caching. Both use the `unlimitedStorage` permission for generous quotas.
-- **Chrome sidePanel API** (MVP), Firefox sidebar_action (future adapter)
+- **Svelte 5** (~1.85KB gzipped) for the side panel UI -- compile-time reactivity, scoped styles, near-zero runtime overhead. The sidebar needs reactive updates for playback sync, tab switching, and search, making vanilla DOM impractical.
+- **Extension local storage** for transcript caching, with the `unlimitedStorage` permission for a generous quota.
+- **Chrome sidePanel API** and Firefox sidebar_action behind one `SidebarHost` port
 - **bun** for package management and script execution
 - **Justfiles** for all build, test, lint, format, and dev commands. No bare `bun run` or `npx` invocations -- everything goes through `just` recipes.
 - **ESLint + Prettier** for linting and formatting (Biome lacks Svelte support)
@@ -82,7 +77,7 @@ All browser-specific and external dependencies are pushed to the edges. Core log
 
 ---
 
-## Transcript Formatting Pipeline
+## Transcript Pipeline
 
 ### Caption Extraction (TranscriptSource)
 
@@ -111,10 +106,9 @@ This is approximately 20 lines of code. No library dependency needed for extract
 
 ```typescript
 interface TimedWord {
-  text: string;       // the word (possibly with punctuation after formatting)
+  text: string;       // the word
   start: number;      // start time in ms
   end: number;        // end time in ms
-  original: string;   // original unpunctuated text (for diff alignment)
 }
 
 interface ParagraphBreak {
@@ -122,98 +116,28 @@ interface ParagraphBreak {
   startTime: number;  // timestamp of the first word in this paragraph
 }
 
-interface Section {
-  title: string;           // generated section header text
-  paragraphIndex: number;  // index into paragraphs[] where this section starts
-  startTime: number;       // timestamp of the first word in this section
+interface Chapter {
+  title: string;           // YouTube chapter title
+  startTime: number;       // chapter start in ms
 }
 
 interface TimedTranscript {
   videoId: string;
   words: TimedWord[];
-  formattingTier: 0 | 1 | 2 | 3;  // current formatting level
   paragraphs: ParagraphBreak[];     // where paragraphs start
-  sections: Section[];              // generated section headers
+  chapters: Chapter[];              // from YouTube's chapter markers
 }
 ```
 
-### Progressive Formatting Tiers
+### Paragraphs and Chapters
 
-Each tier takes the output of the previous tier and enriches it. The side panel re-renders after each tier completes.
-
-**Tier 0 (immediate, no model):** Raw transcript words joined with spaces. Word-level spans in the DOM with timestamps. Displayed instantly while models download.
-
-**Tier 1 -- Punctuation + true-casing + sentence boundaries:** A token-classification model processes the raw word sequence. Output: punctuation inserted, capitalization fixed, sentence boundaries marked. `jsdiff` aligns the punctuated text back to the original `TimedWord` timestamps (see Timestamp Alignment section). Model candidates for spike: `1-800-BAD-CODE/punctuation_fullstop_truecase_english` (~45MB ONNX), `sherpa-onnx Edge-Punct-Casing` (~7MB int8).
-
-**Tier 2 -- Paragraph segmentation:** Two signals combined:
-1. Timestamp gaps: pauses >2s in the original caption data suggest topic shifts
-2. Embedding similarity: compute sentence embeddings via `all-MiniLM-L6-v2` (~23MB), detect cosine similarity drops between consecutive sentences (TextTiling approach)
-
-A threshold-based heuristic combines both signals. Output: paragraph break indices added to `TimedTranscript.paragraphs`.
-
-**Tier 3 -- Section header generation:** A generative model receives clusters of paragraphs and produces a concise heading for each cluster. Paragraphs are grouped by embedding similarity into sections. Model candidates for spike: `Xenova/t5-small` (~120MB q8), `Qwen2.5-0.5B-Instruct` (~350MB q4).
-
-### Model Selection
-
-The specific models for each tier are intentionally not locked in. The `TranscriptFormatter` port interface and adapter pattern make swapping models trivial. A model comparison harness (see Testing Strategy) will be used during Phase 4 to A/B compare candidates on real transcripts and select based on quality, size, and speed tradeoffs.
-
-Candidate models will include both multi-model specialist pipelines (separate models per tier) and single-model approaches (one small LLM handling all tiers via prompting). The harness will compare both strategies.
-
-### Timestamp Alignment via jsdiff
-
-The key challenge: models change the text (add punctuation, fix casing), but we need to preserve word-level timestamps.
-
-**jsdiff** is the `diff` npm package (v8.0.4, ~8,500 dependents). It implements the Myers diff algorithm -- the same core algorithm behind `git diff` -- at configurable granularities. The `diffWords()` function compares two strings word-by-word:
-
-```typescript
-import { diffWords } from 'diff';
-
-const original = "welcome to super mario brothers";
-const formatted = "Welcome to Super Mario Brothers.";
-
-const changes = diffWords(original, formatted);
-// [
-//   { value: "welcome",  removed: true },
-//   { value: "Welcome",  added: true },
-//   { value: " to ",     added: false, removed: false },
-//   { value: "super",    removed: true },
-//   { value: "Super",    added: true },
-//   ...
-// ]
-```
-
-Each change is `{value, added, removed}`. The alignment algorithm:
-
-1. Maintain a cursor into the original `TimedWord[]` array
-2. For each diff chunk:
-   - Unchanged: emit words with original timestamps, advance cursor
-   - Removed+added pair (e.g., "welcome" -> "Welcome"): emit added text with removed text's timestamps, advance cursor
-   - Added only (inserted punctuation like "."): append to previous word's text, keep its timestamp
-   - Removed only (word dropped by model): advance cursor, skip
-
-This produces a new `TimedWord[]` with formatted text and original timestamps. It runs after Tier 1, is deterministic, fast, and the diff library is battle-tested.
-
-### ML Worker Architecture (Chrome)
-
-```
-Side Panel <--messages--> Background SW <--messages--> Offscreen Document
-                                                            |
-                                                       Web Worker
-                                                       (Transformers.js v4)
-                                                            |
-                                                       ONNX Runtime
-                                                       (WebGPU or WASM)
-```
-
-The offscreen document is created once on first use and persists. The Web Worker inside it loads models from Cache API (Transformers.js default caching). Processing progress is streamed back via `chrome.runtime.connect` long-lived port, updating the status indicator in real-time.
-
-**Model caching:** Transformers.js v4 uses the Cache API by default. First download is slow (seconds to tens of seconds depending on model size and connection); all subsequent loads are near-instant from cache. The `unlimitedStorage` permission ensures browser quota is not an issue.
+Paragraph breaks are derived from pauses in the caption timing; the heuristics and their tuning are described in `paragraph-segmentation.md`. Chapter headings come from the video's own chapter markers through `TranscriptSource.fetchChapters`. Videos without chapters render as paragraphs only.
 
 ---
 
 ## Side Panel UI
 
-The side panel is a Svelte 5 app rendered in Chrome's sidePanel context. It communicates with the content script via `chrome.runtime.connect` (long-lived port for streaming playback time) and `chrome.runtime.sendMessage` (one-time requests for captions, formatting triggers).
+The side panel is a Svelte 5 app rendered in the browser's sidebar. It communicates with the content script via `chrome.runtime.connect` (long-lived port for streaming playback time) and `chrome.runtime.sendMessage` (one-time requests for captions, formatting triggers).
 
 ### Activation
 
@@ -221,13 +145,13 @@ Click-to-open: user clicks the extension icon in the toolbar to toggle the side 
 
 ### Layout (top to bottom)
 
-1. **Header bar** -- video title (truncated), search toggle, export button, settings gear
+1. **Header bar** -- pin toggle, video title (a menu of the open YouTube tabs), copy menu (plain text, with timestamps, markdown), auto-scroll toggle, highlight settings, popout
 2. **Transcript body** -- scrollable area containing the formatted transcript
-3. **Status bar** -- current processing tier, model download progress, "done" state
+3. **Status bar** -- loading and error state
 
 ### Transcript Rendering
 
-Each word is a `<span>` with `data-start` and `data-end` attributes. Words are grouped into sentences (after Tier 1), sentences into paragraphs (after Tier 2), paragraphs under section headers (after Tier 3).
+Each word is a `<span>` with `data-start` and `data-end` attributes. Words are grouped into paragraphs, and paragraphs sit under chapter headings when the video has chapters.
 
 ```svelte
 {#each paragraphs as paragraph}
@@ -275,7 +199,7 @@ Each word is a `<span>` with `data-start` and `data-end` attributes. Words are g
 
 ### Markdown Export
 
-Export button copies markdown to clipboard. Format:
+The copy menu copies the transcript as plain text, with timestamps, or as markdown. Markdown format:
 
 ```markdown
 # Everything We Got Wrong About Research-Plan-Implement
@@ -298,7 +222,7 @@ This is something that I think a lot of teams get wrong.
 learned was about iteration speed...
 ```
 
-Each paragraph gets a timestamp link. Section headers (from Tier 3) become `##` headings. Markdown is generated programmatically from the `TimedTranscript` data model. Export uses the current formatting tier -- if only Tier 1 is done, output has punctuation but no section headers.
+Each paragraph gets a timestamp link. YouTube chapters become `##` headings. Markdown is generated programmatically from the `TimedTranscript` data model.
 
 ### Settings (minimal for MVP)
 
@@ -320,7 +244,7 @@ All commands go through `just`. No bare `bun run`, `npx`, or direct tool invocat
 | `just lint` | ESLint |
 | `just fmt` | Prettier format |
 | `just build` | WXT build for Chrome |
-| `just clean` | Remove `.output/`, `.wxt/`, `node_modules/`, model caches |
+| `just clean` | Remove `.output/`, `.wxt/`, `node_modules/` |
 | `just bump` | Bump version, generate release notes, tag, push |
 | `just retag` | Re-trigger release workflow for existing version |
 | `just install-hooks` | Set up pre-commit hook that runs `just check` |
@@ -332,7 +256,6 @@ All commands go through `just`. No bare `bun run`, `npx`, or direct tool invocat
 | `just dev` | WXT dev mode with HMR, launches Chrome with extension loaded |
 | `just test-e2e` | Playwright E2E tests against built extension in headless Chromium |
 | `just build-firefox` | WXT build targeting Firefox (future) |
-| `just model-bench` | Run model comparison harness, output markdown reports |
 | `just fixture-capture <url>` | Save a YouTube page + captions as test fixtures |
 
 ### Test Layers
@@ -341,9 +264,9 @@ All commands go through `just`. No bare `bun run`, `npx`, or direct tool invocat
 
 The bulk of test coverage. Runs in under a second with `just test`.
 
-- Core logic tests: progressive pipeline orchestration, timestamp alignment (jsdiff), search filtering, markdown export generation. Pure functions, no browser APIs.
-- Adapter tests: each adapter tested in isolation against mocks/fakes. `TranscriptSource` against saved JSON3 fixtures. `TranscriptFormatter` with mock model outputs. `TranscriptStore` with `fakeBrowser` in-memory storage.
-- Svelte component tests: side panel components rendered with `@testing-library/svelte` + happy-dom. Verify word spans have correct timestamps, sentence highlighting toggles, search filters correctly, progressive re-rendering preserves scroll position.
+- Core logic tests: caption parsing, paragraph segmentation, playback sync, search filtering, markdown export generation. Pure functions, no browser APIs.
+- Adapter tests: each adapter tested in isolation against mocks/fakes. `TranscriptSource` against saved JSON3 fixtures. `TranscriptStore` with `fakeBrowser` in-memory storage.
+- Svelte component tests: side panel components rendered with `@testing-library/svelte` + happy-dom. Verify word spans have correct timestamps, sentence highlighting toggles, search filters correctly.
 - Message passing tests: content script <-> background <-> side panel flows tested with `fakeBrowser`'s in-memory port/messaging implementation.
 
 **Layer 2: E2E tests (Playwright + Chromium)**
@@ -353,19 +276,9 @@ A smaller set of integration tests. Run with `just test-e2e`.
 - Load the built extension in Chromium via `launchPersistentContext` with `--load-extension`
 - Test against saved YouTube HTML fixtures served from a local static server (not live YouTube -- fast, deterministic, no bot detection)
 - Fixtures include representative pages with `ytInitialPlayerResponse` data intact
-- Tests cover: side panel opens, caption extraction works, click-to-seek, search highlighting, markdown export, progressive formatting updates
+- Tests cover: side panel opens, caption extraction works, click-to-seek, search highlighting, markdown export
 - Side panel pages also testable directly via `chrome-extension://` URL navigation
 - Runs headless
-
-**Layer 3: Model comparison harness (bun scripts)**
-
-Not part of CI. Run manually during spike phases via `just model-bench`. Lives in `tools/model-bench/`.
-
-- Runs Transformers.js in bun against saved transcript fixtures
-- Same `TranscriptFormatter` port interface as the extension -- adapters tested here are directly deployable
-- Outputs markdown comparison reports to `docs/spec/model-comparisons/`
-- Reports include: sample output for each model, processing time, model size
-- Supports running all fixtures against all adapters, or targeted runs
 
 ### Claude's Test Loop
 
@@ -403,16 +316,14 @@ quoth/
 
   src/
     core/                            # The hexagon -- pure logic, no browser APIs
-      pipeline.ts                    # Orchestrates progressive formatting tiers
       search.ts                      # Transcript text search
       export.ts                      # Markdown export generation
       sync.ts                        # Playback time -> active sentence mapping
-      types.ts                       # TimedWord, TimedTranscript, Section, etc.
+      types.ts                       # TimedWord, TimedTranscript, Chapter, etc.
 
     ports/                           # Port interfaces (TypeScript interfaces only)
       video-player.ts
       transcript-source.ts
-      transcript-formatter.ts
       transcript-store.ts
       sidebar-host.ts
       page-detector.ts
@@ -420,16 +331,10 @@ quoth/
     adapters/                        # Adapter implementations
       chrome/
         side-panel-host.ts           # Chrome sidePanel API adapter
-        offscreen-inference.ts       # Offscreen document for ML worker
       youtube/
         player-adapter.ts            # YouTube player API (content script)
         caption-adapter.ts           # Innertube JSON3 caption fetching
         page-detector-adapter.ts     # URL matching, yt-navigate-finish
-      ml/
-        worker.ts                    # Web Worker running Transformers.js
-        punctuation-adapter.ts       # Token classification model adapter
-        paragraph-adapter.ts         # Embedding similarity adapter
-        heading-adapter.ts           # Generative model adapter
       storage/
         indexeddb-adapter.ts         # IndexedDB/Cache API
 
@@ -445,8 +350,6 @@ quoth/
           SearchBar.svelte
           StatusBar.svelte
           ExportButton.svelte
-      offscreen.html                 # Offscreen document for ML inference
-      offscreen.ts
 
   tests/
     unit/
@@ -457,7 +360,6 @@ quoth/
         sync.test.ts
       adapters/
         caption-adapter.test.ts
-        punctuation-adapter.test.ts
       components/
         TranscriptView.test.ts
         SearchBar.test.ts
@@ -472,15 +374,8 @@ quoth/
       captions/
         dexter-horthy.json
         mortal-shell-2.json
-      formatted/
-        dexter-horthy-tier1.json
-        dexter-horthy-tier2.json
 
   tools/
-    model-bench/
-      bench.ts
-      report.ts
-      adapters/
     fixture-capture.ts
 
   docs/
@@ -542,38 +437,12 @@ Goal: Search within the transcript and export to markdown.
 - Unit tests for search logic and markdown generation
 - E2E tests for search and export
 
-### Phase 4: ML Formatting Pipeline -- Spike and Tier 1
-
-Goal: Determine which models to use, then ship Tier 1 (punctuation + true-casing).
-
-- `TranscriptFormatter` port interface finalized
-- Offscreen document + Web Worker infrastructure for Transformers.js v4
-- Model comparison harness operational (`tools/model-bench/`, `just model-bench`)
-- At least 2 punctuation model adapters compared
-- `jsdiff` timestamp alignment working
-- Spike report written to `docs/spec/model-comparisons/`
-- Tier 1 integrated: raw transcript -> punctuated transcript, progressive update
-- Status bar showing model download progress and processing state
-- Model cached via Cache API + `unlimitedStorage`
-
-### Phase 5: Tier 2 and Tier 3 Formatting
-
-Goal: Paragraph segmentation and section header generation.
-
-- Tier 2: sentence embeddings, cosine similarity + timestamp gap heuristics
-- Paragraphs rendered with spacing and timestamp links
-- Spike and compare models for Tier 3 via the harness
-- Tier 3: generative model produces section headers
-- Section headers in side panel and markdown export
-- Progressive rendering: each tier updates UI as it completes
-- All tiers cached for instant reload on revisit
-
-### Phase 6: Polish
+### Phase 4: Polish
 
 Goal: Production-ready for Chrome Web Store and GitHub release.
 
 - Extension icon and branding
-- Error handling: no captions available, network failures, model download failures, live streams
+- Error handling: no captions available, network failures, live streams
 - Performance profiling for large transcripts (2+ hour videos)
 - Release workflow: build, package `.zip`, GitHub release
 - `just bump` and `just retag`
@@ -585,12 +454,10 @@ Goal: Production-ready for Chrome Web Store and GitHub release.
 
 ## Unresolved
 
-- **WebGPU in Firefox:** caniuse.com and other research disagree on whether Firefox 141+ has stable WebGPU support. Needs verification before the Firefox adapter phase. Affects which models are viable for Tier 3 (section headers) on Firefox. WASM fallback works regardless.
-- **Specific ML models for each tier:** Intentionally deferred to Phase 4 spike. The adapter pattern makes swapping trivial.
 - **`playwright-cli` extension loading:** The `playwright-cli` skill supports `--browser=chrome` but it's unclear if Chrome launch args (like `--load-extension`) can be passed to load our unpacked extension during interactive debugging. Needs verification during Phase 1. Workaround: use a persistent profile with the extension pre-installed.
 
 ---
 
 ## Reference Research
 
-Additional research on WXT, Transformers.js, YouTube Innertube API, browser extension architecture, and ML model options is available in `docs/spec/other-research.md`.
+Research on WXT, the YouTube Innertube API, browser extension architecture, and the ML model options that were evaluated and dropped is available in `docs/spec/other-research.md`.
