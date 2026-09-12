@@ -117,13 +117,13 @@ by resetting `currentVideoId` and refetching all three network calls
 loaded seconds earlier.
 
 **Fix (`src/entrypoints/content.ts`):** the content script keeps its last
-fully-loaded result in memory (videoInfo, captionTracks, words, chapters, or
-the fetch error). On `request-state`:
+successfully loaded result in memory (videoInfo, captionTracks, words,
+chapters). Failures are never cached, so a transient caption error retries on
+the next `request-state` instead of replaying forever. On `request-state`:
 
-- Same video + completed payload → replays `video-detected` and
-  `captions-loaded`/`captions-error` immediately. Zero network; the Loading
-  flash shrinks to two message hops.
-- Different video, unfinished fetch, or no video → fetches as before.
+- Same video as the cache → replays `video-detected` and `captions-loaded`
+  immediately. Zero network; the Loading flash shrinks to two message hops.
+- Different video, nothing cached, or no video → fetches as before.
 
 The replay decision is the pure `shouldReplayCached()` helper in
 `src/core/replay.ts` (unit-tested). First visit to a tab still costs the three
