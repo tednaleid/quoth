@@ -30,14 +30,17 @@ export default defineBackground(() => {
     await browser.tabs.create({ url });
   });
 
-  // Handle open-page requests (from content script, used by smoke tests in Firefox)
+  // Handle open-page requests from the content script (test and screenshot automation).
+  // For the sidepanel, the docked sidebar is tried first; it only opens when the
+  // message rides on a user gesture, so a plain tab is the fallback.
   browser.runtime.onMessage.addListener((message: { type?: string; page?: string }, sender) => {
     if (message?.type !== 'open-page' || !sender.tab?.id) return false;
     const tabId = sender.tab.id;
 
     if (message.page === 'sidepanel') {
-      const url = browser.runtime.getURL('/sidepanel.html');
-      browser.tabs.create({ url });
+      sidebarHost.open(tabId).catch(() => {
+        browser.tabs.create({ url: browser.runtime.getURL('/sidepanel.html') });
+      });
     } else if (message.page === 'popout') {
       const url = browser.runtime.getURL(`/popout.html?tabId=${tabId}`);
       browser.tabs.create({ url });
