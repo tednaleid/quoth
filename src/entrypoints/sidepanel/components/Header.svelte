@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { CopyFormat, TranscriptMode } from '../../../core/settings';
+  import type { CopyFormat } from '../../../core/settings';
 
   interface Props {
     title: string;
@@ -9,8 +9,6 @@
     settingsOpen: boolean;
     onPopout?: () => void;
     disconnected?: boolean;
-    mode?: TranscriptMode;
-    onToggleMode?: () => void;
     copyFormat?: CopyFormat;
     onCopyFormatChange?: (format: CopyFormat) => void;
     onCopy?: () => void;
@@ -24,8 +22,6 @@
     settingsOpen,
     onPopout,
     disconnected,
-    mode = 'seek',
-    onToggleMode,
     copyFormat = 'markdown',
     onCopyFormatChange,
     onCopy,
@@ -36,19 +32,6 @@
 <header>
   <h1 class:disconnected>{title || 'Quoth'}</h1>
   <div class="controls">
-    {#if onToggleMode}
-      <button
-        class="toggle"
-        class:active={mode === 'copy'}
-        onclick={onToggleMode}
-        title={mode === 'copy'
-          ? 'Copy mode: text selection on, seek off'
-          : 'Seek mode: click text to seek'}
-        aria-label="Toggle seek/copy mode"
-      >
-        {mode === 'copy' ? '📋' : '🔍'}
-      </button>
-    {/if}
     {#if onCopy}
       <select
         class="format"

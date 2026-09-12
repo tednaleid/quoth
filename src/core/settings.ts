@@ -3,9 +3,6 @@
  * ABOUTME: Pure data only; storage and UI live in adapters.
  */
 
-/** Transcript interaction mode: seek (click-to-seek) or copy (plain selectable text). */
-export type TranscriptMode = 'seek' | 'copy';
-
 /** Copy-to-clipboard format: markdown links, plain [m:ss] timestamps, or plain text. */
 export type CopyFormat = 'markdown' | 'timestamps' | 'plain';
 
@@ -22,8 +19,6 @@ export interface HighlightSettings {
   peakCap: number;
   /** Total future reach of the fade horizon, in seconds. All knees scale from this. */
   horizonSeconds: number;
-  /** Transcript interaction mode. Persisted so copy mode survives reloads. */
-  mode: TranscriptMode;
   /** Preferred copy-to-clipboard format. */
   copyFormat: CopyFormat;
 }
@@ -36,7 +31,6 @@ export const DEFAULT_SETTINGS: HighlightSettings = {
   current: '#ffffff',
   peakCap: 0.53,
   horizonSeconds: 7.5,
-  mode: 'seek',
   copyFormat: 'markdown',
 };
 

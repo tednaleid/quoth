@@ -1,45 +1,27 @@
 # Copy Transcript & YouTube Tab Selector
 
-User-facing features for note-taking workflows: an explicit seek/copy mode so
-transcript text can be selected like normal text, a one-click Copy Transcript
-button with format options, a dropdown to choose which open YouTube tab the
+User-facing features for note-taking workflows: transcript text that can be
+selected like normal text without triggering a seek, a Copy Transcript
+button with format options, a way to choose which open YouTube tab the
 sidebar shows, and an in-memory replay cache that makes switching tabs instant.
 
-## 1. Seek mode vs copy mode
+## 1. Selecting text without seeking
 
-The header toggle (🔍 seek / 📋 copy) switches how the transcript behaves.
-Persisted in `HighlightSettings.mode`, so the choice survives reloads.
+Every word, timestamp, and chapter title is a click-to-seek target, so a
+plain click must seek while a drag-select must not. There is no separate
+"copy mode": auto-scroll has its own toggle, and the highlight never blocks
+selection.
 
-| Behavior | Seek mode (default) | Copy mode |
-|---|---|---|
-| Click word / timestamp / chapter | Seeks the video, snaps scroll to the word | Nothing (inert text) |
-| Drag-select text | Selects without seeking (click-vs-drag guard) | Selects normally |
-| Auto-scroll snap on playback | On | Off (scroll stays where you put it) |
-| Horizon / current-word highlight | On | Off (plain text) |
-| Timestamps | Clickable YouTube links (`watch?v=…&t=…`) | Plain text |
-| Clipboard | Manual Ctrl+C works | Manual Ctrl+C works |
-
-Implementation:
-
-- `src/core/settings.ts` — `TranscriptMode = 'seek' | 'copy'`,
-  `CopyFormat = 'markdown' | 'timestamps' | 'plain'`; both persisted with
-  merge-over-defaults migration for old saves.
-- `src/entrypoints/sidepanel/components/TranscriptView.svelte` — takes
-  `mode` (default `'seek'`, so the popout is unaffected). In copy mode words
-  render without `role=button`/`onclick`, intensity is forced to 0, the
-  `current-word` class is suppressed, both auto-scroll `$effect`s early-return,
-  and timestamps/chapters render as spans instead of links.
 - `src/core/click-guard.ts` — pure `shouldSeekOnClick(down, up,
-  selectionCollapsed)`: a click seeks only if the pointer moved ≤ 5px and no
-  text is selected. The component records `mousedown` position and reads
-  `window.getSelection()` at click time; the boolean crosses into core so
-  `core/` stays free of browser APIs. Fixes two bugs at once: clicking text no
-  longer yanks scroll to the top, and drag-selecting no longer triggers a seek.
-- `src/entrypoints/sidepanel/App.svelte:handleSeek` also guards against copy
-  mode as defense in depth.
+  selectionCollapsed)`: a click seeks only if the pointer moved 5px or less
+  and no text is selected. The component records the `mousedown` position and
+  reads `window.getSelection()` at click time; only the boolean crosses into
+  core so `core/` stays free of browser APIs. This covers the one case where
+  a drag fires a click event: mousedown and mouseup landing inside the same
+  word. A drag across words fires the click on their common ancestor, which
+  has no seek handler.
 - CSS: `.transcript` and `.word` set `user-select: text` (plus
-  `-moz-user-select` for Gecko); copy mode switches the cursor to `text` and
-  disables hover highlighting.
+  `-moz-user-select` for Gecko).
 
 ## 2. Copy Transcript button
 
@@ -150,8 +132,8 @@ it is the natural next step.
   never mounted; stub added in `tools/smoke-test-firefox.ts`) and
   `just smoke-test` / `test-e2e` on Chromium (real extension, transcript load,
   exact-ms click-to-seek, popout).
-- **Manual checklist:** drag-select in seek mode (no seek, Ctrl+C works);
-  copy-mode toggle freezes highlight/scroll; all three copy formats paste
+- **Manual checklist:** drag-select (no seek, Ctrl+C works);
+  all three copy formats paste
   correctly; dropdown switches transcripts; pin survives background tab
   activity; closing the pinned tab degrades gracefully; no-captions video
   disables copy.

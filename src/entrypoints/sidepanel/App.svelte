@@ -134,8 +134,6 @@
   }
 
   function handleSeek(timeMs: number) {
-    // Copy mode renders no seek targets, but guard anyway.
-    if (settings.mode === 'copy') return;
     if (youtubeTabId) {
       sendToTab(youtubeTabId, { type: 'seek-to', timeMs });
     }
@@ -189,9 +187,6 @@
     settingsOpen
     onToggleSettings={() => (settingsOpen = !settingsOpen)}
     onPopout={handlePopout}
-    mode={settings.mode}
-    onToggleMode={() =>
-      updateSettings({ ...settings, mode: settings.mode === 'copy' ? 'seek' : 'copy' })}
     copyFormat={settings.copyFormat}
     onCopyFormatChange={(format: CopyFormat) => updateSettings({ ...settings, copyFormat: format })}
     onCopy={handleCopy}
@@ -221,7 +216,6 @@
       horizonSeconds={settings.horizonSeconds}
       onSeek={handleSeek}
       onAutoScrollDisable={() => (autoScroll = false)}
-      mode={settings.mode}
     />
   {:else}
     <div class="placeholder">
