@@ -6,15 +6,12 @@
 /**
  * Returns true when a `request-state` message can be answered by replaying the
  * tab's already-loaded transcript instead of refetching from the network.
- * Replay is safe only when the page video matches the cached video and the
- * previous fetch actually completed (hasPayload).
+ * Only successful loads are cached, so a matching video id means a complete
+ * transcript is available.
  */
 export function shouldReplayCached(
   cachedVideoId: string | null,
-  hasPayload: boolean,
   pageVideoId: string | null,
 ): boolean {
-  return (
-    cachedVideoId !== null && hasPayload && pageVideoId !== null && cachedVideoId === pageVideoId
-  );
+  return cachedVideoId !== null && pageVideoId !== null && cachedVideoId === pageVideoId;
 }

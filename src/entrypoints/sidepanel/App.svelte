@@ -4,27 +4,19 @@
     handleMessage,
     type TranscriptState,
   } from '../../core/message-handler';
-  import { setupTabConnector, listYouTubeTabs } from '../../adapters/browser/tab-connector';
-  import type { YouTubeTabInfo } from '../../ports/tab-connector';
+  import { setupTabConnector } from '../../adapters/browser/tab-connector';
+  import type { TabConnection, YouTubeTabInfo } from '../../ports/tab-connector';
   import { SettingsStorage } from '../../adapters/browser/settings-storage';
-  import { copyTextToClipboard } from '../../adapters/browser/clipboard';
-  import {
-    formatPlainText,
-    formatWithTimestamps,
-    formatWithMarkdownLinks,
-  } from '../../core/transcript-export';
-  import {
-    DEFAULT_SETTINGS,
-    hexToRgbString,
-    type CopyFormat,
-    type HighlightSettings,
-  } from '../../core/settings';
+  import { DEFAULT_SETTINGS, hexToRgbString, type HighlightSettings } from '../../core/settings';
+  import type { CopyFormat } from '../../core/transcript-export';
   import type { ContentMessage, SidePanelMessage } from '../../messages';
   import { isSeek } from '../../core/seek-detector';
+  import { copyTranscript } from './copy-transcript';
+  import { createToast } from './toast.svelte';
   import Header from './components/Header.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
   import StatusBar from './components/StatusBar.svelte';
-  import TabSelector from './components/TabSelector.svelte';
+  import Toast from './components/Toast.svelte';
   import TranscriptView from './components/TranscriptView.svelte';
 
   let state: TranscriptState = $state(createInitialState());
@@ -33,14 +25,15 @@
   let settingsOpen = $state(false);
   let lastTimeMs: number | null = $state(null);
   let forceSnapToken = $state(0);
+  const toast = createToast();
 
   // Track the YouTube tab we're connected to (for message filtering and seeking)
   let youtubeTabId: number | null = $state(null);
   // Follow-active (default) vs pinned to a manually selected tab.
   let followActive = $state(true);
   let availableTabs: YouTubeTabInfo[] = $state([]);
-  let toast: { message: string; error: boolean } | null = $state(null);
-  let toastTimer: ReturnType<typeof setTimeout> | null = null;
+  // The connected tab closed or left YouTube; the last transcript stays visible but dimmed.
+  let disconnected = $state(false);
 
   // Load + persist user highlight settings via browser.storage.local.
   const settingsStorage = new SettingsStorage(browser.storage.local);
@@ -60,77 +53,27 @@
     });
   }
 
-  function showToast(message: string, error = false) {
-    if (toastTimer) clearTimeout(toastTimer);
-    toast = { message, error };
-    toastTimer = setTimeout(() => {
-      toast = null;
-      toastTimer = null;
-    }, 2500);
-  }
-
-  function connectToTab(tabId: number) {
-    youtubeTabId = tabId;
-    state = { ...createInitialState(), status: 'Loading...' };
-    sendToTab(tabId, { type: 'request-state' });
-  }
+  // The connector owns which tab is connected; the panel only asks it to pin or follow.
+  let connection: TabConnection | null = null;
 
   function handlePinTab(tabId: number) {
     followActive = false;
-    connectToTab(tabId);
+    connection?.pin(tabId);
   }
 
-  async function handleToggleFollow() {
-    followActive = true;
-    // Reconnect to the active YouTube tab (fall back to the first one).
-    try {
-      const tabs = await listYouTubeTabs();
-      const active = tabs.find((t) => t.active) ?? tabs[0];
-      if (active) connectToTab(active.id);
-    } catch (err) {
-      console.warn('[quoth sidebar] failed to list YouTube tabs:', err);
-    }
-  }
-
-  function handleTabsChanged(tabs: YouTubeTabInfo[]) {
-    availableTabs = tabs;
-    if (youtubeTabId !== null && !tabs.some((t) => t.id === youtubeTabId)) {
-      // Connected tab was closed or navigated away.
-      if (followActive) {
-        const active = tabs.find((t) => t.active) ?? tabs[0];
-        if (active) {
-          connectToTab(active.id);
-        } else {
-          youtubeTabId = null;
-          state = { ...createInitialState(), status: 'No YouTube tabs open' };
-        }
-      } else {
-        youtubeTabId = null;
-        state = { ...createInitialState(), status: 'Pinned tab closed' };
-      }
-    }
-  }
-
-  function buildCopyText(): string {
-    const { words, segments } = state;
-    const videoId = state.videoInfo?.videoId ?? '';
-    if (settings.copyFormat === 'plain') return formatPlainText(words, segments);
-    if (settings.copyFormat === 'timestamps') return formatWithTimestamps(words, segments);
-    return formatWithMarkdownLinks(words, segments, videoId);
-  }
-
-  async function handleCopy() {
-    if (state.words.length === 0) {
-      showToast('Nothing to copy yet', true);
+  function handleToggleFollow() {
+    if (followActive) {
+      if (youtubeTabId !== null) handlePinTab(youtubeTabId);
       return;
     }
-    try {
-      await copyTextToClipboard(buildCopyText());
-      showToast('Transcript copied to clipboard!');
-    } catch (err) {
-      console.warn('[quoth sidebar] copy failed:', err);
-      showToast('Copy failed — select the text manually', true);
-    }
+    followActive = true;
+    connection?.follow().catch((err) => {
+      console.warn('[quoth sidebar] failed to follow active tab:', err);
+    });
+  }
+
+  function handleCopy(format: CopyFormat) {
+    void copyTranscript(state, format, toast, '[quoth sidebar]');
   }
 
   // Only handle messages from the tab we're connected to
@@ -161,8 +104,6 @@
   }
 
   function handleSeek(timeMs: number) {
-    // Copy mode renders no seek targets, but guard anyway.
-    if (settings.mode === 'copy') return;
     if (youtubeTabId) {
       sendToTab(youtubeTabId, { type: 'seek-to', timeMs });
     }
@@ -179,20 +120,33 @@
 
   setupTabConnector({
     onConnect(tabId) {
-      // Ignore follow-active switches while pinned to a manual selection.
-      if (!followActive) return;
       youtubeTabId = tabId;
+      disconnected = false;
       state = { ...createInitialState(), status: 'Loading...' };
     },
     sendMessage(tabId, message) {
       sendToTab(tabId, message);
     },
-    onTabsChanged: handleTabsChanged,
-    isPinned: () => !followActive,
+    onTabsChanged(tabs) {
+      availableTabs = tabs;
+    },
+    onDisconnect(reason) {
+      youtubeTabId = null;
+      disconnected = true;
+      state = {
+        ...state,
+        currentTimeMs: 0,
+        status: reason === 'pinned-tab-closed' ? 'Pinned tab closed' : 'YouTube tab closed',
+      };
+    },
+  }).then((conn) => {
+    connection = conn;
   });
 </script>
 
 <main
+  class="app"
+  class:disconnected
   style:--bg={settings.bg}
   style:--text={settings.text}
   style:--horizon-rgb={hexToRgbString(settings.peak)}
@@ -205,24 +159,17 @@
       autoScroll = !autoScroll;
       if (autoScroll) forceSnapToken++;
     }}
-    settingsOpen
+    {settingsOpen}
     onToggleSettings={() => (settingsOpen = !settingsOpen)}
     onPopout={handlePopout}
-    mode={settings.mode}
-    onToggleMode={() =>
-      updateSettings({ ...settings, mode: settings.mode === 'copy' ? 'seek' : 'copy' })}
-    copyFormat={settings.copyFormat}
-    onCopyFormatChange={(format: CopyFormat) => updateSettings({ ...settings, copyFormat: format })}
-    onCopy={handleCopy}
-    copyDisabled={state.words.length === 0}
-  />
-
-  <TabSelector
+    {disconnected}
     tabs={availableTabs}
     selectedTabId={youtubeTabId}
     {followActive}
     onSelectTab={handlePinTab}
     onToggleFollow={handleToggleFollow}
+    onCopy={handleCopy}
+    copyDisabled={state.words.length === 0}
   />
 
   <SettingsPanel {settings} open={settingsOpen} onChange={updateSettings} />
@@ -240,7 +187,6 @@
       horizonSeconds={settings.horizonSeconds}
       onSeek={handleSeek}
       onAutoScrollDisable={() => (autoScroll = false)}
-      mode={settings.mode}
     />
   {:else}
     <div class="placeholder">
@@ -248,89 +194,7 @@
     </div>
   {/if}
 
-  {#if toast}
-    <div class="toast" class:error={toast.error} role="status">
-      {toast.message}
-    </div>
-  {/if}
+  <Toast toast={toast.current} />
 
   <StatusBar status={state.status} />
 </main>
-
-<style>
-  :global(:root) {
-    color-scheme: light dark;
-
-    /* Chrome colors (border, dim text, etc.). The four "palette" vars
-       (--bg, --text, --horizon-rgb, --current-word-text) are set on <main>
-       from user settings, so they don't live here. */
-    --text-dim: #888;
-    --text-dimmer: #666;
-    --text-very-dim: #556;
-    --text-very-dim-hover: #88a;
-    --border-dim: #2a2a4a;
-    --button-border: #333;
-    --button-border-active: #446;
-    --button-text-active: #aac;
-    --chapter-link: #c0c8e0;
-    --chapter-link-hover: #e0e8ff;
-    --segment-hover: rgba(100, 150, 255, 0.15);
-  }
-
-  @media (prefers-color-scheme: light) {
-    :global(:root) {
-      --text-dim: #667;
-      --text-dimmer: #889;
-      --text-very-dim: #99a;
-      --text-very-dim-hover: #556;
-      --border-dim: #dde;
-      --button-border: #ccd;
-      --button-border-active: #99a;
-      --button-text-active: #334;
-      --chapter-link: #3a4a7a;
-      --chapter-link-hover: #1a2340;
-      --segment-hover: rgba(60, 110, 220, 0.1);
-    }
-  }
-
-  main {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    font-family:
-      system-ui,
-      -apple-system,
-      sans-serif;
-    color: var(--text);
-    background: var(--bg);
-    font-size: 16px;
-    position: relative;
-  }
-
-  .placeholder {
-    flex: 1;
-    padding: 12px;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .toast {
-    position: absolute;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #333;
-    color: #fff;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 13px;
-    white-space: nowrap;
-    z-index: 10;
-  }
-
-  .toast.error {
-    background: #7a2a2a;
-  }
-</style>

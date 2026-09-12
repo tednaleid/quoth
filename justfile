@@ -30,8 +30,8 @@ test-watch *ARGS:
     bunx vitest {{ARGS}}
 
 # Install the Playwright browser used by e2e and smoke tests (idempotent)
-install-browsers:
-    bunx playwright install chromium
+install-browsers *BROWSERS="chromium":
+    bunx playwright install {{BROWSERS}}
 
 # Run E2E tests (Chromium-based, requires Chrome build)
 test-e2e: install-browsers
@@ -104,7 +104,8 @@ install-hooks:
     @echo "Pre-commit hook installed."
 
 # Smoke test: load extension and verify transcript flow (default: chrome, or: just smoke-test firefox)
-smoke-test BROWSER="chrome" *URL: install-browsers
+smoke-test BROWSER="chrome" *URL:
+    just install-browsers {{ if BROWSER == "chrome" { "chromium" } else { "firefox" } }}
     just build {{ if BROWSER == "chrome" { "chrome" } else { "" } }}
     bun run tools/smoke-test-{{BROWSER}}.ts {{URL}}
 

@@ -10,7 +10,11 @@ test.describe('Side Panel', () => {
   test.beforeAll(async () => {
     context = await chromium.launchPersistentContext('', {
       headless: false,
-      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+      args: [
+        '--mute-audio',
+        `--disable-extensions-except=${extensionPath}`,
+        `--load-extension=${extensionPath}`,
+      ],
     });
 
     // Get extension ID from the service worker

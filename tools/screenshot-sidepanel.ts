@@ -15,6 +15,7 @@ console.log('Launching browser with extension...');
 const context = await chromium.launchPersistentContext('', {
   headless: false,
   args: [
+    '--mute-audio',
     `--disable-extensions-except=${extensionPath}`,
     `--load-extension=${extensionPath}`,
   ],

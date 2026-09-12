@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TimedWord, Chapter } from '../../../core/types';
   import {
+    assignChaptersToSegments,
     findActiveWordIndex,
     findHorizonWindow,
     horizonIntensity,
@@ -10,7 +11,6 @@
   import { formatTime } from '../../../core/time-format';
   import { shouldSeekOnClick } from '../../../core/click-guard';
   import { timestampUrl } from '../../../core/transcript-export';
-  import type { TranscriptMode } from '../../../core/settings';
 
   // Auto-scroll tunables. The active line is free to drift in the top
   // TOP_ZONE_FRACTION of the viewport without triggering scroll. When it
@@ -41,7 +41,6 @@
     horizonSeconds: number;
     onSeek: (timeMs: number) => void;
     onAutoScrollDisable?: () => void;
-    mode?: TranscriptMode;
   }
 
   let {
@@ -56,11 +55,7 @@
     horizonSeconds,
     onSeek,
     onAutoScrollDisable,
-    mode = 'seek',
   }: Props = $props();
-
-  // Copy mode: inert selectable text -- no highlight, no auto-scroll, no seek.
-  let copyMode = $derived(mode === 'copy');
 
   // Derived horizon knees from the user-controlled horizonSeconds setting.
   let knees = $derived(makeHorizonKnees(horizonSeconds));
@@ -73,27 +68,8 @@
   // -1 when no word is active.
   let currentWordIdx: number = $derived(findActiveWordIndex(words, currentTimeMs));
 
-  // Map segment index -> chapter that starts at or just before this segment.
-  // Uses a plain object instead of Map to avoid Svelte reactivity lint warning.
-  let chapterMap: Record<number, Chapter> = $derived.by(() => {
-    const map: Record<number, Chapter> = {};
-    if (chapters.length === 0 || segments.length === 0) return map;
-    const assigned: Record<number, boolean> = {};
-    let chapterIdx = 0;
-    for (let segIdx = 0; segIdx < segments.length; segIdx++) {
-      while (
-        chapterIdx + 1 < chapters.length &&
-        chapters[chapterIdx + 1].startTimeMs <= segments[segIdx].startTime
-      ) {
-        chapterIdx++;
-      }
-      if (chapters[chapterIdx].startTimeMs <= segments[segIdx].startTime && !assigned[chapterIdx]) {
-        map[segIdx] = chapters[chapterIdx];
-        assigned[chapterIdx] = true;
-      }
-    }
-    return map;
-  });
+  // Map segment index -> chapter that begins at that segment.
+  let chapterMap: Record<number, Chapter> = $derived(assignChaptersToSegments(segments, chapters));
 
   let segmentEls: (HTMLElement | undefined)[] = $state([]);
   let transcriptEl: HTMLDivElement | undefined = $state();
@@ -136,10 +112,8 @@
 
   // Drift auto-scroll: on every current-word change, if the active word has
   // drifted past the top zone, snap it back near the top.
-  // Disabled in copy mode so selecting text never moves the scroll position.
   $effect(() => {
     void currentWordIdx;
-    if (copyMode) return;
     if (!autoScroll || !transcriptEl || currentWordIdx < 0) return;
     const wordEl = transcriptEl.querySelector('.current-word') as HTMLElement | null;
     if (!wordEl) return;
@@ -152,10 +126,8 @@
 
   // Force-snap: when the parent signals a seek or autoscroll re-enable,
   // scroll the current word to near the top unconditionally.
-  // Disabled in copy mode.
   $effect(() => {
     void forceSnapToken;
-    if (copyMode) return;
     if (!autoScroll || currentWordIdx < 0) return;
     requestAnimationFrame(snapCurrentWordToTop);
   });
@@ -199,7 +171,6 @@
 
 <div
   class="transcript"
-  class:copy-mode={copyMode}
   bind:this={transcriptEl}
   style:--peak-cap={peakCap}
   onwheel={handleWheel}
@@ -212,51 +183,40 @@
     {#if chapterMap[segIdx]}
       {@const chapter = chapterMap[segIdx]}
       <h3 class="chapter-title">
-        {#if copyMode}
+        <a
+          class="chapter-link"
+          href={timestampHref(chapter.startTimeMs)}
+          onclick={(e) => handleSeekClick(e, chapter.startTimeMs)}
+        >
           <span class="chapter-timestamp">{formatTime(chapter.startTimeMs)}</span>
           {chapter.title}
-        {:else}
-          <a
-            class="chapter-link"
-            href={timestampHref(chapter.startTimeMs)}
-            onclick={(e) => handleSeekClick(e, chapter.startTimeMs)}
-          >
-            <span class="chapter-timestamp">{formatTime(chapter.startTimeMs)}</span>
-            {chapter.title}
-          </a>
-        {/if}
+        </a>
       </h3>
     {/if}
     <p class="segment" bind:this={segmentEls[segIdx]}>
-      {#if copyMode}
-        <span class="timestamp">{formatTime(segment.startTime)}</span>
-      {:else}
-        <a
-          class="timestamp"
-          href={timestampHref(segment.startTime)}
-          onclick={(e) => handleSeekClick(e, segment.startTime)}
-        >
-          {formatTime(segment.startTime)}
-        </a>
-      {/if}
+      <a
+        class="timestamp"
+        href={timestampHref(segment.startTime)}
+        onclick={(e) => handleSeekClick(e, segment.startTime)}
+      >
+        {formatTime(segment.startTime)}
+      </a>
       {#each { length: segment.endIndex - segment.startIndex + 1 } as _, i (segment.startIndex + i)}
         {@const wordIdx = segment.startIndex + i}
         {@const word = words[wordIdx]}
         {@const inHorizon = wordIdx >= horizonWindow[0] && wordIdx <= horizonWindow[1]}
-        {@const intensity = copyMode
-          ? 0
-          : inHorizon
-            ? Math.min(horizonIntensity(word, currentTimeMs, knees), peakCap)
-            : 0}
+        {@const intensity = inHorizon
+          ? Math.min(horizonIntensity(word, currentTimeMs, knees), peakCap)
+          : 0}
         <span
           class="word"
-          class:current-word={wordIdx === currentWordIdx && !copyMode}
+          class:current-word={wordIdx === currentWordIdx}
           style:--word-intensity={intensity}
           data-start={word.start}
           data-end={word.end}
-          onclick={copyMode ? undefined : (e) => handleSeekClick(e, word.start)}
-          role={copyMode ? undefined : 'button'}
-          tabindex={copyMode ? undefined : '-1'}>{word.text + ' '}</span
+          onclick={(e) => handleSeekClick(e, word.start)}
+          role="button"
+          tabindex="-1">{word.text + ' '}</span
         >
       {/each}
     </p>
@@ -329,14 +289,6 @@
     user-select: text;
     -moz-user-select: text;
     background-color: rgba(var(--horizon-rgb), var(--word-intensity, 0));
-  }
-
-  .copy-mode .word {
-    cursor: text;
-  }
-
-  .copy-mode .word:hover {
-    background-color: transparent;
   }
 
   .word:hover {

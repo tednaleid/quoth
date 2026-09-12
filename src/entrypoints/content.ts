@@ -18,16 +18,16 @@ export default defineContentScript({
     let currentVideoId: string | null = null;
     let stopTimeUpdates: (() => void) | null = null;
 
-    // In-memory replay cache: the last fully-loaded transcript for this tab.
+    // In-memory replay cache: the last successfully loaded transcript for this tab.
     // Tab switches send `request-state`; replaying the cache answers instantly
     // with zero network instead of refetching metadata + captions + chapters.
+    // Failures are never cached, so the next request-state retries the fetch.
     let loaded: {
       videoId: string;
       videoInfo: VideoInfo | null;
       captionTracks: CaptionTrack[];
-      words: TimedWord[] | null;
+      words: TimedWord[];
       chapters: Chapter[];
-      error: string | null;
     } | null = null;
 
     function sendMessage(message: ContentMessage) {
@@ -52,6 +52,7 @@ export default defineContentScript({
       const videoId = extractVideoId(window.location.href);
       if (!videoId || videoId === currentVideoId) return;
       currentVideoId = videoId;
+      loaded = null;
 
       const { videoInfo, captionTracks } = await transcriptSource.getVideoMetadata(videoId);
 
@@ -71,26 +72,16 @@ export default defineContentScript({
             transcriptSource.fetchTranscript(englishTrack),
             transcriptSource.fetchChapters(videoId),
           ]);
-          loaded = { videoId, videoInfo, captionTracks, words, chapters, error: null };
+          loaded = { videoId, videoInfo, captionTracks, words, chapters };
           sendMessage({ type: 'captions-loaded', videoId, words, chapters });
         } catch (err) {
-          const error = err instanceof Error ? err.message : 'Unknown error';
-          loaded = { videoId, videoInfo, captionTracks, words: null, chapters: [], error };
           sendMessage({
             type: 'captions-error',
             videoId,
-            error,
+            error: err instanceof Error ? err.message : 'Unknown error',
           });
         }
       } else {
-        loaded = {
-          videoId,
-          videoInfo,
-          captionTracks,
-          words: null,
-          chapters: [],
-          error: 'No English captions available',
-        };
         sendMessage({
           type: 'captions-error',
           videoId,
@@ -110,15 +101,11 @@ export default defineContentScript({
 
     function replayLoaded(): void {
       if (!loaded) return;
-      const { videoId, videoInfo, captionTracks, words, chapters, error } = loaded;
+      const { videoId, videoInfo, captionTracks, words, chapters } = loaded;
       if (videoInfo) {
         sendMessage({ type: 'video-detected', videoId, videoInfo, captionTracks });
       }
-      if (words) {
-        sendMessage({ type: 'captions-loaded', videoId, words, chapters });
-      } else {
-        sendMessage({ type: 'captions-error', videoId, error: error ?? 'Unknown error' });
-      }
+      sendMessage({ type: 'captions-loaded', videoId, words, chapters });
     }
 
     browser.runtime.onMessage.addListener((message: SidePanelMessage) => {
@@ -127,13 +114,7 @@ export default defineContentScript({
       }
       if (message.type === 'request-state') {
         // Fast path: same video already loaded in this tab -- replay instantly.
-        if (
-          shouldReplayCached(
-            loaded?.videoId ?? null,
-            loaded !== null,
-            extractVideoId(window.location.href),
-          )
-        ) {
+        if (shouldReplayCached(loaded?.videoId ?? null, extractVideoId(window.location.href))) {
           replayLoaded();
         } else {
           loaded = null;

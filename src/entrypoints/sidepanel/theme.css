@@ -1,0 +1,62 @@
+/* ABOUTME: Theme variables and app-shell styles shared by the side panel and popout pages. */
+/* ABOUTME: The four palette vars (--bg, --text, --horizon-rgb, --current-word-text) are set on <main> from user settings. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Chrome colors (border, dim text, etc.). */
+  --text-dim: #888;
+  --text-dimmer: #666;
+  --text-very-dim: #556;
+  --text-very-dim-hover: #88a;
+  --border-dim: #2a2a4a;
+  --button-border: #4a4d63;
+  --button-border-active: #6b6f8a;
+  --button-text-active: #aac;
+  --chapter-link: #c0c8e0;
+  --chapter-link-hover: #e0e8ff;
+  --segment-hover: rgba(100, 150, 255, 0.15);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --text-dim: #667;
+    --text-dimmer: #889;
+    --text-very-dim: #99a;
+    --text-very-dim-hover: #556;
+    --border-dim: #dde;
+    --button-border: #b8bcc8;
+    --button-border-active: #7a7f94;
+    --button-text-active: #334;
+    --chapter-link: #3a4a7a;
+    --chapter-link-hover: #1a2340;
+    --segment-hover: rgba(60, 110, 220, 0.1);
+  }
+}
+
+main.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-size: 16px;
+  position: relative;
+}
+
+main.app.disconnected {
+  opacity: 0.6;
+}
+
+.placeholder {
+  flex: 1;
+  padding: 12px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

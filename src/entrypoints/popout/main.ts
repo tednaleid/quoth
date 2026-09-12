@@ -1,4 +1,5 @@
 import { mount } from 'svelte';
+import '../sidepanel/theme.css';
 import PopoutApp from './PopoutApp.svelte';
 
 const pinnedTabId = Number(new URLSearchParams(window.location.search).get('tabId'));

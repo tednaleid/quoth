@@ -14,6 +14,7 @@ export default defineConfig({
         headless: false,
         launchOptions: {
           args: [
+            '--mute-audio',
             `--disable-extensions-except=${extensionPath}`,
             `--load-extension=${extensionPath}`,
           ],

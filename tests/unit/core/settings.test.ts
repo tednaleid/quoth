@@ -10,8 +10,6 @@ describe('DEFAULT_SETTINGS', () => {
       current: '#ffffff',
       peakCap: 0.53,
       horizonSeconds: 7.5,
-      mode: 'seek',
-      copyFormat: 'markdown',
     });
   });
 });

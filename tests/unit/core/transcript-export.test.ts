@@ -1,14 +1,15 @@
 /**
  * ABOUTME: Tests for pure transcript export formatters (copy feature).
- * ABOUTME: Covers plain text, timestamped, and markdown-link formats.
+ * ABOUTME: Covers plain text, timestamped, and markdown document formats.
  */
 import { describe, it, expect } from 'vitest';
 import {
   formatPlainText,
   formatWithTimestamps,
-  formatWithMarkdownLinks,
+  formatMarkdown,
+  formatTranscript,
 } from '../../../src/core/transcript-export';
-import type { TimedWord } from '../../../src/core/types';
+import type { Chapter, TimedWord, VideoInfo } from '../../../src/core/types';
 import type { WordSegment } from '../../../src/core/playback-sync';
 
 const words: TimedWord[] = [
@@ -21,6 +22,18 @@ const words: TimedWord[] = [
 const segments: WordSegment[] = [
   { startIndex: 0, endIndex: 1, startTime: 0, endTime: 1000 },
   { startIndex: 2, endIndex: 3, startTime: 61000, endTime: 62000 },
+];
+
+const videoInfo: VideoInfo = {
+  videoId: 'abc123',
+  title: 'A Talk',
+  channelName: 'Some Channel',
+  durationMs: 2723000,
+};
+
+const chapters: Chapter[] = [
+  { title: 'Intro', startTimeMs: 0 },
+  { title: 'Main Point', startTimeMs: 60000 },
 ];
 
 describe('formatPlainText', () => {
@@ -47,11 +60,44 @@ describe('formatWithTimestamps', () => {
   });
 });
 
-describe('formatWithMarkdownLinks', () => {
-  it('prefixes each paragraph with a clickable YouTube timestamp link', () => {
-    expect(formatWithMarkdownLinks(words, segments, 'abc123')).toBe(
-      '[[0:00](https://youtube.com/watch?v=abc123&t=0)] Hello world.\n\n' +
-        '[[1:01](https://youtube.com/watch?v=abc123&t=61)] Second para.',
+describe('formatMarkdown', () => {
+  it('emits title, metadata line, chapter headings, and timestamp-linked paragraphs', () => {
+    expect(formatMarkdown(words, segments, chapters, videoInfo)).toBe(
+      '# A Talk\n\n' +
+        '[Video](https://youtube.com/watch?v=abc123) | Some Channel | 45:23\n\n' +
+        '## Intro\n\n' +
+        '[0:00](https://youtube.com/watch?v=abc123&t=0) Hello world.\n\n' +
+        '## Main Point\n\n' +
+        '[1:01](https://youtube.com/watch?v=abc123&t=61) Second para.',
+    );
+  });
+
+  it('omits chapter headings when the video has no chapters', () => {
+    expect(formatMarkdown(words, segments, [], videoInfo)).toBe(
+      '# A Talk\n\n' +
+        '[Video](https://youtube.com/watch?v=abc123) | Some Channel | 45:23\n\n' +
+        '[0:00](https://youtube.com/watch?v=abc123&t=0) Hello world.\n\n' +
+        '[1:01](https://youtube.com/watch?v=abc123&t=61) Second para.',
+    );
+  });
+});
+
+describe('formatTranscript', () => {
+  it('dispatches to the plain, timestamps, and markdown formatters', () => {
+    expect(formatTranscript('plain', words, segments, chapters, videoInfo)).toBe(
+      formatPlainText(words, segments),
+    );
+    expect(formatTranscript('timestamps', words, segments, chapters, videoInfo)).toBe(
+      formatWithTimestamps(words, segments),
+    );
+    expect(formatTranscript('markdown', words, segments, chapters, videoInfo)).toBe(
+      formatMarkdown(words, segments, chapters, videoInfo),
+    );
+  });
+
+  it('falls back to timestamps for markdown when video metadata is missing', () => {
+    expect(formatTranscript('markdown', words, segments, chapters, null)).toBe(
+      formatWithTimestamps(words, segments),
     );
   });
 });

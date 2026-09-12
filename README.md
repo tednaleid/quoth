@@ -60,7 +60,6 @@ Quoth requests only the permissions it needs, all scoped to youtube.com.
 | `tabs` | Queries open tabs to find YouTube videos and sends messages between the sidebar and content scripts running on YouTube. |
 | `storage` | Caches parsed transcripts locally (keyed by video ID) so repeat visits load instantly without re-fetching from YouTube. |
 | `unlimitedStorage` | Extends the default 5 MB storage quota. A single transcript is small (~200 KB), but users who watch many videos benefit from a larger cache. |
-| `clipboardWrite` | Lets the Copy Transcript button write to the system clipboard. Used only on click, with a manual-selection fallback if denied. |
 
 ### What Quoth does NOT do
 

@@ -20,6 +20,7 @@ const context = await chromium.launchPersistentContext('', {
   headless: false,
   viewport: VIEWPORT,
   args: [
+    '--mute-audio',
     `--disable-extensions-except=${extensionPath}`,
     `--load-extension=${extensionPath}`,
     `--window-size=${VIEWPORT.width},${VIEWPORT.height}`,
