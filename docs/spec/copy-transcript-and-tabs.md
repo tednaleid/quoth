@@ -65,8 +65,10 @@ adapters per the hexagonal layout):
    Firefox contexts.
 3. Throws if both fail → error toast.
 
-Manifest: `clipboardWrite` was added to `wxt.config.ts` permissions (Firefox-safe,
-harmless on Chrome). No new host permissions; everything stays on youtube.com.
+Manifest: no new permissions. The copy runs inside a click handler, so
+`navigator.clipboard.writeText()` works without `clipboardWrite` in both
+browsers, and adding a permission would prompt existing Firefox users on
+update. No new host permissions; everything stays on youtube.com.
 
 ## 3. YouTube tab selector
 

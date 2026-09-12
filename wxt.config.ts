@@ -33,7 +33,6 @@ export default defineConfig({
       'storage',
       'unlimitedStorage',
       'contextMenus',
-      'clipboardWrite',
     ],
     host_permissions: ['*://*.youtube.com/*'],
     action: {
