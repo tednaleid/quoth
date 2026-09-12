@@ -8,6 +8,9 @@
     type WordSegment,
   } from '../../../core/playback-sync';
   import { formatTime } from '../../../core/time-format';
+  import { shouldSeekOnClick } from '../../../core/click-guard';
+  import { timestampUrl } from '../../../core/transcript-export';
+  import type { TranscriptMode } from '../../../core/settings';
 
   // Auto-scroll tunables. The active line is free to drift in the top
   // TOP_ZONE_FRACTION of the viewport without triggering scroll. When it
@@ -38,6 +41,7 @@
     horizonSeconds: number;
     onSeek: (timeMs: number) => void;
     onAutoScrollDisable?: () => void;
+    mode?: TranscriptMode;
   }
 
   let {
@@ -52,7 +56,11 @@
     horizonSeconds,
     onSeek,
     onAutoScrollDisable,
+    mode = 'seek',
   }: Props = $props();
+
+  // Copy mode: inert selectable text -- no highlight, no auto-scroll, no seek.
+  let copyMode = $derived(mode === 'copy');
 
   // Derived horizon knees from the user-controlled horizonSeconds setting.
   let knees = $derived(makeHorizonKnees(horizonSeconds));
@@ -128,8 +136,10 @@
 
   // Drift auto-scroll: on every current-word change, if the active word has
   // drifted past the top zone, snap it back near the top.
+  // Disabled in copy mode so selecting text never moves the scroll position.
   $effect(() => {
     void currentWordIdx;
+    if (copyMode) return;
     if (!autoScroll || !transcriptEl || currentWordIdx < 0) return;
     const wordEl = transcriptEl.querySelector('.current-word') as HTMLElement | null;
     if (!wordEl) return;
@@ -142,8 +152,10 @@
 
   // Force-snap: when the parent signals a seek or autoscroll re-enable,
   // scroll the current word to near the top unconditionally.
+  // Disabled in copy mode.
   $effect(() => {
     void forceSnapToken;
+    if (copyMode) return;
     if (!autoScroll || currentWordIdx < 0) return;
     requestAnimationFrame(snapCurrentWordToTop);
   });
@@ -161,18 +173,38 @@
     if (KEY_SCROLL_KEYS.has(e.key)) disableAutoScroll();
   }
 
-  function timestampUrl(timeMs: number): string {
-    const seconds = Math.floor(timeMs / 1000);
-    return `https://youtube.com/watch?v=${videoId}&t=${seconds}`;
+  function timestampHref(timeMs: number): string {
+    return timestampUrl(videoId, timeMs);
+  }
+
+  // Click-vs-drag guard: a mousedown records the pointer; the click handler
+  // only seeks on a plain click with no text selection, so drag-selecting
+  // text to copy never seeks or snaps the scroll position.
+  let downPos: { x: number; y: number } | null = null;
+
+  function handleMouseDown(e: MouseEvent) {
+    downPos = { x: e.clientX, y: e.clientY };
+  }
+
+  function handleSeekClick(e: MouseEvent, timeMs: number) {
+    e.preventDefault();
+    const collapsed = window.getSelection()?.isCollapsed ?? true;
+    const up = { x: e.clientX, y: e.clientY };
+    if (downPos && shouldSeekOnClick(downPos, up, collapsed)) {
+      onSeek(timeMs);
+    }
+    downPos = null;
   }
 </script>
 
 <div
   class="transcript"
+  class:copy-mode={copyMode}
   bind:this={transcriptEl}
   style:--peak-cap={peakCap}
   onwheel={handleWheel}
   onkeydown={handleKeydown}
+  onmousedown={handleMouseDown}
   role="region"
   tabindex="-1"
 >
@@ -180,46 +212,51 @@
     {#if chapterMap[segIdx]}
       {@const chapter = chapterMap[segIdx]}
       <h3 class="chapter-title">
-        <a
-          class="chapter-link"
-          href={timestampUrl(chapter.startTimeMs)}
-          onclick={(e) => {
-            e.preventDefault();
-            onSeek(chapter.startTimeMs);
-          }}
-        >
+        {#if copyMode}
           <span class="chapter-timestamp">{formatTime(chapter.startTimeMs)}</span>
           {chapter.title}
-        </a>
+        {:else}
+          <a
+            class="chapter-link"
+            href={timestampHref(chapter.startTimeMs)}
+            onclick={(e) => handleSeekClick(e, chapter.startTimeMs)}
+          >
+            <span class="chapter-timestamp">{formatTime(chapter.startTimeMs)}</span>
+            {chapter.title}
+          </a>
+        {/if}
       </h3>
     {/if}
     <p class="segment" bind:this={segmentEls[segIdx]}>
-      <a
-        class="timestamp"
-        href={timestampUrl(segment.startTime)}
-        onclick={(e) => {
-          e.preventDefault();
-          onSeek(segment.startTime);
-        }}
-      >
-        {formatTime(segment.startTime)}
-      </a>
+      {#if copyMode}
+        <span class="timestamp">{formatTime(segment.startTime)}</span>
+      {:else}
+        <a
+          class="timestamp"
+          href={timestampHref(segment.startTime)}
+          onclick={(e) => handleSeekClick(e, segment.startTime)}
+        >
+          {formatTime(segment.startTime)}
+        </a>
+      {/if}
       {#each { length: segment.endIndex - segment.startIndex + 1 } as _, i (segment.startIndex + i)}
         {@const wordIdx = segment.startIndex + i}
         {@const word = words[wordIdx]}
         {@const inHorizon = wordIdx >= horizonWindow[0] && wordIdx <= horizonWindow[1]}
-        {@const intensity = inHorizon
-          ? Math.min(horizonIntensity(word, currentTimeMs, knees), peakCap)
-          : 0}
+        {@const intensity = copyMode
+          ? 0
+          : inHorizon
+            ? Math.min(horizonIntensity(word, currentTimeMs, knees), peakCap)
+            : 0}
         <span
           class="word"
-          class:current-word={wordIdx === currentWordIdx}
+          class:current-word={wordIdx === currentWordIdx && !copyMode}
           style:--word-intensity={intensity}
           data-start={word.start}
           data-end={word.end}
-          onclick={() => onSeek(word.start)}
-          role="button"
-          tabindex="-1">{word.text + ' '}</span
+          onclick={copyMode ? undefined : (e) => handleSeekClick(e, word.start)}
+          role={copyMode ? undefined : 'button'}
+          tabindex={copyMode ? undefined : '-1'}>{word.text + ' '}</span
         >
       {/each}
     </p>
@@ -231,6 +268,8 @@
     flex: 1;
     overflow-y: auto;
     padding: 8px 12px;
+    user-select: text;
+    -moz-user-select: text;
   }
 
   .chapter-title {
@@ -287,7 +326,17 @@
 
   .word {
     cursor: pointer;
+    user-select: text;
+    -moz-user-select: text;
     background-color: rgba(var(--horizon-rgb), var(--word-intensity, 0));
+  }
+
+  .copy-mode .word {
+    cursor: text;
+  }
+
+  .copy-mode .word:hover {
+    background-color: transparent;
   }
 
   .word:hover {

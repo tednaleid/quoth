@@ -6,12 +6,14 @@ player. Everything runs client-side: no server, no accounts, no data leaves
 the browser.
 
 ## Stack
+
 - Language: TypeScript + Svelte 5
 - Framework: WXT (cross-browser extension toolkit)
 - Build: bun (lockfile: `bun.lock`)
 - Task runner: `just` (authoritative -- see `justfile`)
 
 ## Common commands
+
 - Check all: `just check` (tests + lint + typecheck + format check; used by CI)
 - Test: `just test [pattern]`
 - E2E: `just test-e2e` (Playwright on Chromium, builds Chrome extension first)
@@ -34,6 +36,7 @@ runtime. WXT entry points in `src/entrypoints/` wire adapters to the Svelte
 sidepanel, YouTube content scripts, and background worker.
 
 ## Key paths
+
 - `src/core/` -- pure logic (caption parsing, playback sync, seek detection, settings)
 - `src/ports/` -- interfaces (transcript source, cache store, tab connector, video player)
 - `src/adapters/youtube/` -- Innertube API client and video player adapter
@@ -46,7 +49,7 @@ sidepanel, YouTube content scripts, and background worker.
 - `src/entrypoints/popout/` -- popout tab UI (right-click icon -> Open in new tab)
 - `tests/unit/` -- Vitest unit tests
 - `tests/e2e/` -- Playwright E2E tests
-- `tools/` -- smoke-test, debug-firefox, fixture-capture, transcript CLI, model-bench
+- `tools/` -- smoke-test, debug-firefox, fixture-capture, transcript CLI
 - `wxt.config.ts` -- manifest, permissions, persistent dev profiles under `.wxt/profiles/`
 - `.github/workflows/ci.yml` -- runs `just check` and E2E on push/PR
 - `.github/workflows/release.yml` -- triggered by `just bump` pushing a tag
@@ -68,6 +71,7 @@ For Firefox console logging during interactive debug:
 `just debug-firefox '<url>'` forwards all `[quoth]` messages to stdout.
 
 ## Dig deeper
+
 - `README.md` -- install instructions and permission rationale
 - `docs/spec/design.md` -- product and UX design
 - `docs/spec/architecture.md` -- ports/adapters structure in detail

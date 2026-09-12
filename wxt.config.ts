@@ -27,7 +27,14 @@ export default defineConfig({
   manifest: {
     name: 'Quoth',
     description: 'YouTube transcript viewer with client-side formatting',
-    permissions: ['activeTab', 'tabs', 'storage', 'unlimitedStorage', 'contextMenus'],
+    permissions: [
+      'activeTab',
+      'tabs',
+      'storage',
+      'unlimitedStorage',
+      'contextMenus',
+      'clipboardWrite',
+    ],
     host_permissions: ['*://*.youtube.com/*'],
     action: {
       default_title: 'Quoth',
