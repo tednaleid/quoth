@@ -63,8 +63,9 @@ jobs:
         id: cws_check
         env:
           EID: ${{ secrets.CHROME_EXTENSION_ID }}
+          PID: ${{ secrets.CHROME_PUBLISHER_ID }}
         run: |
-          if [ -n "${EID:-}" ]; then
+          if [ -n "${EID:-}" ] && [ -n "${PID:-}" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
@@ -78,16 +79,32 @@ jobs:
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
           CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           chrome_zip=".output/quoth-${version}-chrome.zip"
+          item_path="publishers/${CHROME_PUBLISHER_ID}/items/${CHROME_EXTENSION_ID}"
           access_token=$(curl -sSf -X POST -d \
             "client_id=${CHROME_CLIENT_ID}&client_secret=${CHROME_CLIENT_SECRET}&refresh_token=${CHROME_REFRESH_TOKEN}&grant_type=refresh_token" \
             https://oauth2.googleapis.com/token | jq -r .access_token)
-          curl -sSf -H "Authorization: Bearer ${access_token}" -H "x-goog-api-version: 2" \
-            -X PUT -T "${chrome_zip}" \
-            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}"
-          curl -sSf -H "Authorization: Bearer ${access_token}" -H "x-goog-api-version: 2" \
-            -H "Content-Length: 0" -X POST \
-            "https://www.googleapis.com/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}/publish"
+          auth=(-H "Authorization: Bearer ${access_token}")
+
+          upload=$(curl -sSf "${auth[@]}" -X POST -T "${chrome_zip}" \
+            "https://chromewebstore.googleapis.com/upload/v2/${item_path}:upload")
+          echo "${upload}"
+          state=$(echo "${upload}" | jq -r .uploadState)
+          # The upload is processed asynchronously; poll until it settles.
+          while [[ "${state}" == *IN_PROGRESS ]]; do
+            sleep 10
+            state=$(curl -sSf "${auth[@]}" \
+              "https://chromewebstore.googleapis.com/v2/${item_path}:fetchStatus" | jq -r .lastAsyncUploadState)
+            echo "upload state: ${state}"
+          done
+          if [[ "${state}" != *SUCCEEDED ]]; then
+            echo "Chrome Web Store upload failed: ${state}" >&2
+            exit 1
+          fi
+
+          curl -sSf "${auth[@]}" -H "Content-Type: application/json" -X POST -d '{}' \
+            "https://chromewebstore.googleapis.com/v2/${item_path}:publish"

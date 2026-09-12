@@ -274,8 +274,9 @@ Needed so CI can push subsequent versions automatically.
    ```bash
    export CHROME_REFRESH_TOKEN="..."
    export CHROME_EXTENSION_ID="..."   # from B2
+   export CHROME_PUBLISHER_ID="..."   # CWS dashboard -> Publisher -> Settings
    ```
-8. Push all four to GitHub:
+8. Push all five to GitHub:
    ```bash
    just setup-chrome-secrets
    ```
@@ -296,7 +297,7 @@ version that doesn't collide. The flow:
 
 1. Wait for AMO to approve v0.2.1.
 2. Wait for Chrome Web Store first listing to be approved (Part B).
-3. Confirm `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`,
+3. Confirm `CHROME_EXTENSION_ID`, `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`,
    `CHROME_CLIENT_SECRET`, `CHROME_REFRESH_TOKEN` secrets are set
    (`just setup-chrome-secrets`).
 4. Run `just bump 0.2.2` -- bumps version, generates notes, commits,
@@ -325,10 +326,11 @@ releases AMO typically stops asking.
 
 ### C2. Chrome Web Store upload (DONE)
 
-`release.yml` now hits the Chrome Web Store API directly via `curl` --
-no third-party action, no SHA pinning needed. The step is gated on the
-presence of `CHROME_EXTENSION_ID` so it skips cleanly when secrets
-aren't yet configured.
+`release.yml` hits the Chrome Web Store API v2 directly via `curl` --
+no third-party action, no SHA pinning needed. Every v2 URL carries the
+publisher ID as well as the extension ID. The step is gated on the
+presence of `CHROME_EXTENSION_ID` and `CHROME_PUBLISHER_ID` so it skips
+cleanly when secrets aren't yet configured.
 
 ### C3. Ship v0.2.2 once both stores are ready
 
@@ -359,9 +361,10 @@ incrementing the version.
 | `WEB_EXT_API_KEY` | `web-ext sign` (Firefox) | https://addons.mozilla.org/developers/addon/api/key/ |
 | `WEB_EXT_API_SECRET` | `web-ext sign` (Firefox) | same page |
 | `CHROME_EXTENSION_ID` | CWS upload step | CWS dashboard, after first item creation (B2) |
+| `CHROME_PUBLISHER_ID` | CWS upload step | CWS dashboard -> Publisher -> Settings |
 | `CHROME_CLIENT_ID` | CWS upload step | Google Cloud Console OAuth client (B5.4) |
 | `CHROME_CLIENT_SECRET` | CWS upload step | same |
 | `CHROME_REFRESH_TOKEN` | CWS upload step | `just chrome-store-refresh-token` (B5.6) |
 
 `just setup-github-secrets` pushes the AMO pair.
-`just setup-chrome-secrets` pushes the four Chrome ones.
+`just setup-chrome-secrets` pushes the five Chrome ones.

@@ -181,17 +181,18 @@ chrome-store-refresh-token:
     bun run tools/get-cws-refresh-token.ts
 
 # Push Chrome Web Store API credentials from env to GitHub repository secrets.
-# Requires CHROME_EXTENSION_ID, CHROME_CLIENT_ID, CHROME_CLIENT_SECRET, CHROME_REFRESH_TOKEN.
+# Requires CHROME_EXTENSION_ID, CHROME_PUBLISHER_ID, CHROME_CLIENT_ID, CHROME_CLIENT_SECRET, CHROME_REFRESH_TOKEN.
 setup-chrome-secrets:
     #!/usr/bin/env bash
     set -euo pipefail
-    for var in CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN; do
+    for var in CHROME_EXTENSION_ID CHROME_PUBLISHER_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN; do
         if [ -z "${!var:-}" ]; then
             echo "Error: $var must be set in your environment"
             exit 1
         fi
     done
     gh secret set CHROME_EXTENSION_ID --body "$CHROME_EXTENSION_ID"
+    gh secret set CHROME_PUBLISHER_ID --body "$CHROME_PUBLISHER_ID"
     gh secret set CHROME_CLIENT_ID --body "$CHROME_CLIENT_ID"
     gh secret set CHROME_CLIENT_SECRET --body "$CHROME_CLIENT_SECRET"
     gh secret set CHROME_REFRESH_TOKEN --body "$CHROME_REFRESH_TOKEN"

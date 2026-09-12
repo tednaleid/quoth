@@ -63,13 +63,16 @@ for the one-time setup history and re-run instructions.
 - **AMO**: signed `--channel listed`, auto-publishes once the listing is
   approved. Uses `WEB_EXT_API_KEY` / `WEB_EXT_API_SECRET`.
 - **Chrome Web Store**: uploaded and published via the Chrome Web Store
-  API. Uses `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`,
-  `CHROME_CLIENT_SECRET`, `CHROME_REFRESH_TOKEN`. The release.yml step
-  is gated on `CHROME_EXTENSION_ID` being set, so first releases without
-  Chrome creds skip the upload cleanly.
+  API v2 (`chromewebstore.googleapis.com/v2`). Uses `CHROME_EXTENSION_ID`,
+  `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`,
+  `CHROME_REFRESH_TOKEN`. The upload is asynchronous, so the step polls
+  `fetchStatus` until the package settles before calling `publish`. The
+  release.yml step is gated on `CHROME_EXTENSION_ID` and
+  `CHROME_PUBLISHER_ID` being set, so first releases without Chrome creds
+  skip the upload cleanly.
 
 `just setup-github-secrets` pushes the AMO pair from local env;
-`just setup-chrome-secrets` pushes the four Chrome ones.
+`just setup-chrome-secrets` pushes the five Chrome ones.
 
 ## CI Pipeline
 
