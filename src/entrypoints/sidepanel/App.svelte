@@ -11,7 +11,7 @@
   import {
     formatPlainText,
     formatWithTimestamps,
-    formatWithMarkdownLinks,
+    formatMarkdown,
   } from '../../core/transcript-export';
   import {
     DEFAULT_SETTINGS,
@@ -85,11 +85,13 @@
   }
 
   function buildCopyText(): string {
-    const { words, segments } = state;
-    const videoId = state.videoInfo?.videoId ?? '';
+    const { words, segments, chapters, videoInfo } = state;
     if (settings.copyFormat === 'plain') return formatPlainText(words, segments);
-    if (settings.copyFormat === 'timestamps') return formatWithTimestamps(words, segments);
-    return formatWithMarkdownLinks(words, segments, videoId);
+    // Markdown links need the video id, so without metadata fall back to plain timestamps.
+    if (settings.copyFormat === 'timestamps' || !videoInfo) {
+      return formatWithTimestamps(words, segments);
+    }
+    return formatMarkdown(words, segments, chapters, videoInfo);
   }
 
   async function handleCopy() {

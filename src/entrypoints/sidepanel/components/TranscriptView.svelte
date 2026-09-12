@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TimedWord, Chapter } from '../../../core/types';
   import {
+    assignChaptersToSegments,
     findActiveWordIndex,
     findHorizonWindow,
     horizonIntensity,
@@ -67,27 +68,8 @@
   // -1 when no word is active.
   let currentWordIdx: number = $derived(findActiveWordIndex(words, currentTimeMs));
 
-  // Map segment index -> chapter that starts at or just before this segment.
-  // Uses a plain object instead of Map to avoid Svelte reactivity lint warning.
-  let chapterMap: Record<number, Chapter> = $derived.by(() => {
-    const map: Record<number, Chapter> = {};
-    if (chapters.length === 0 || segments.length === 0) return map;
-    const assigned: Record<number, boolean> = {};
-    let chapterIdx = 0;
-    for (let segIdx = 0; segIdx < segments.length; segIdx++) {
-      while (
-        chapterIdx + 1 < chapters.length &&
-        chapters[chapterIdx + 1].startTimeMs <= segments[segIdx].startTime
-      ) {
-        chapterIdx++;
-      }
-      if (chapters[chapterIdx].startTimeMs <= segments[segIdx].startTime && !assigned[chapterIdx]) {
-        map[segIdx] = chapters[chapterIdx];
-        assigned[chapterIdx] = true;
-      }
-    }
-    return map;
-  });
+  // Map segment index -> chapter that begins at that segment.
+  let chapterMap: Record<number, Chapter> = $derived(assignChaptersToSegments(segments, chapters));
 
   let segmentEls: (HTMLElement | undefined)[] = $state([]);
   let transcriptEl: HTMLDivElement | undefined = $state();

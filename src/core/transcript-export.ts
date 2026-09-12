@@ -1,9 +1,9 @@
 /**
  * ABOUTME: Pure formatters for copying the transcript to the clipboard.
- * ABOUTME: Plain text, [m:ss] timestamps, or markdown YouTube links per paragraph.
+ * ABOUTME: Plain text, [m:ss] timestamps, or a markdown document with chapters and timestamp links.
  */
-import type { TimedWord } from './types';
-import type { WordSegment } from './playback-sync';
+import type { Chapter, TimedWord, VideoInfo } from './types';
+import { assignChaptersToSegments, type WordSegment } from './playback-sync';
 import { formatTime, timeToSeconds } from './time-format';
 
 function paragraphText(words: TimedWord[], startIndex: number, endIndex: number): string {
@@ -14,8 +14,12 @@ function paragraphText(words: TimedWord[], startIndex: number, endIndex: number)
     .trim();
 }
 
+function videoUrl(videoId: string): string {
+  return `https://youtube.com/watch?v=${videoId}`;
+}
+
 export function timestampUrl(videoId: string, timeMs: number): string {
-  return `https://youtube.com/watch?v=${videoId}&t=${timeToSeconds(timeMs)}`;
+  return `${videoUrl(videoId)}&t=${timeToSeconds(timeMs)}`;
 }
 
 /** Paragraphs joined by blank lines, no timestamps. */
@@ -30,16 +34,29 @@ export function formatWithTimestamps(words: TimedWord[], segments: WordSegment[]
     .join('\n\n');
 }
 
-/** Each paragraph prefixed with a clickable markdown YouTube timestamp link. */
-export function formatWithMarkdownLinks(
+/**
+ * A markdown document: title heading, a video link / channel / duration line,
+ * chapters as second-level headings, and each paragraph prefixed with a
+ * clickable YouTube timestamp link. Paragraphs are not hard-wrapped.
+ */
+export function formatMarkdown(
   words: TimedWord[],
   segments: WordSegment[],
-  videoId: string,
+  chapters: Chapter[],
+  videoInfo: VideoInfo,
 ): string {
-  return segments
-    .map(
-      (s) =>
-        `[[${formatTime(s.startTime)}](${timestampUrl(videoId, s.startTime)})] ${paragraphText(words, s.startIndex, s.endIndex)}`,
-    )
-    .join('\n\n');
+  const { videoId, title, channelName, durationMs } = videoInfo;
+  const chapterAt = assignChaptersToSegments(segments, chapters);
+  const blocks: string[] = [
+    `# ${title}`,
+    `[Video](${videoUrl(videoId)}) | ${channelName} | ${formatTime(durationMs)}`,
+  ];
+  segments.forEach((s, segIdx) => {
+    const chapter = chapterAt[segIdx];
+    if (chapter) blocks.push(`## ${chapter.title}`);
+    blocks.push(
+      `[${formatTime(s.startTime)}](${timestampUrl(videoId, s.startTime)}) ${paragraphText(words, s.startIndex, s.endIndex)}`,
+    );
+  });
+  return blocks.join('\n\n');
 }

@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
+  assignChaptersToSegments,
   findActiveWordIndex,
   findHorizonWindow,
   groupWordsIntoSegments,
   horizonIntensity,
   makeHorizonKnees,
+  type WordSegment,
 } from '../../../src/core/playback-sync';
-import type { TimedWord } from '../../../src/core/types';
+import type { Chapter, TimedWord } from '../../../src/core/types';
 
 // All horizonIntensity / findHorizonWindow tests use this knee set, which
 // reproduces the historical defaults (future 1.5/3/10, past 0.75/1.5/5).
@@ -290,5 +292,36 @@ describe('findHorizonWindow', () => {
     expect(findHorizonWindow(single, 0, knees)).toEqual([0, 0]);
     expect(findHorizonWindow(single, 5_000, knees)).toEqual([0, 0]); // still within past window
     expect(findHorizonWindow(single, 6_000, knees)).toEqual([-1, -1]); // past 5s boundary
+  });
+});
+
+describe('assignChaptersToSegments', () => {
+  const segments: WordSegment[] = [
+    { startIndex: 0, endIndex: 1, startTime: 0, endTime: 1000 },
+    { startIndex: 2, endIndex: 3, startTime: 30000, endTime: 31000 },
+    { startIndex: 4, endIndex: 5, startTime: 61000, endTime: 62000 },
+  ];
+
+  it('places each chapter on the first segment that starts at or after it', () => {
+    const chapters: Chapter[] = [
+      { title: 'Intro', startTimeMs: 0 },
+      { title: 'Main', startTimeMs: 45000 },
+    ];
+    expect(assignChaptersToSegments(segments, chapters)).toEqual({
+      0: chapters[0],
+      2: chapters[1],
+    });
+  });
+
+  it('assigns nothing when there are no chapters', () => {
+    expect(assignChaptersToSegments(segments, [])).toEqual({});
+  });
+
+  it('keeps only the latest chapter when several start before the same segment', () => {
+    const chapters: Chapter[] = [
+      { title: 'A', startTimeMs: 1000 },
+      { title: 'B', startTimeMs: 2000 },
+    ];
+    expect(assignChaptersToSegments(segments, chapters)).toEqual({ 1: chapters[1] });
   });
 });

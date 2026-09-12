@@ -33,9 +33,13 @@ selection. Copy of an empty transcript toasts "Nothing to copy yet".
 Formats (paragraphs joined by blank lines), all pure functions in
 `src/core/transcript-export.ts`:
 
-- **Markdown links** (default) — each paragraph keeps a clickable timestamp,
-  so pasted notes stay navigable:
-  `[[1:01](https://youtube.com/watch?v=abc123&t=61)] Second para.`
+- **Markdown** (default) — the document format from `docs/spec/design.md`:
+  a `#` title, a `[Video](url) | channel | duration` line, chapters as `##`
+  headings, and each paragraph prefixed with a clickable timestamp link:
+  `[1:01](https://youtube.com/watch?v=abc123&t=61) Second para.` Paragraphs
+  are not hard-wrapped, since Obsidian renders single newlines as breaks.
+  Chapter placement uses the same `assignChaptersToSegments` helper as the
+  sidebar, so the export and the view agree on where a chapter begins.
 - **Timestamps** — plain `[1:01] Second para.` (also `[h:mm:ss]` past an hour).
 - **Plain** — paragraph text only, no timestamps.
 

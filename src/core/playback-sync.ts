@@ -2,7 +2,7 @@
  * ABOUTME: Core logic for syncing transcript display with video playback.
  * ABOUTME: Provides binary search for active word and segment grouping for paragraph display.
  */
-import type { TimedWord } from './types';
+import type { Chapter, TimedWord } from './types';
 
 export interface WordSegment {
   startIndex: number;
@@ -239,4 +239,32 @@ export function findActiveSegmentIndex(segments: WordSegment[], currentTimeMs: n
     if (currentTimeMs >= segments[i].startTime) return i;
   }
   return -1;
+}
+
+/**
+ * Maps segment index -> chapter that begins at that segment. A chapter lands on
+ * the first segment starting at or after its start time; when several chapters
+ * start before the same segment, only the latest one is kept.
+ */
+export function assignChaptersToSegments(
+  segments: WordSegment[],
+  chapters: Chapter[],
+): Record<number, Chapter> {
+  const map: Record<number, Chapter> = {};
+  if (chapters.length === 0 || segments.length === 0) return map;
+  const assigned: Record<number, boolean> = {};
+  let chapterIdx = 0;
+  for (let segIdx = 0; segIdx < segments.length; segIdx++) {
+    while (
+      chapterIdx + 1 < chapters.length &&
+      chapters[chapterIdx + 1].startTimeMs <= segments[segIdx].startTime
+    ) {
+      chapterIdx++;
+    }
+    if (chapters[chapterIdx].startTimeMs <= segments[segIdx].startTime && !assigned[chapterIdx]) {
+      map[segIdx] = chapters[chapterIdx];
+      assigned[chapterIdx] = true;
+    }
+  }
+  return map;
 }
