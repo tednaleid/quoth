@@ -86,28 +86,32 @@ package; nothing is fetched and executed at runtime.`
 ## Asset checklist
 
 Source files live under `assets/store/`. The store screenshots show the
-sidebar docked in the real browser, which automation cannot open, so they
-are captured by hand (see below) and then squared up with
-`just normalize-screenshots`. `just screenshots` produces separate
-tab-based captures for design review, not the store set.
+sidebar docked in the real browser window. `just store-screenshots`
+captures all six: it launches each browser with the extension, opens the
+docked sidebar (Chrome through the extension's user-gesture hook, Firefox
+through the View menu), widens it to match the committed shots, and
+captures the OS window with `screencapture`. The terminal needs Screen
+Recording and Accessibility permission, and the mouse must be left alone
+while it runs since it drives real pointer events. `just screenshots`
+produces separate tab-based captures for design review, not the store set.
 
 | Asset | Spec | Source | Status |
 |---|---|---|---|
 | Icon 128x128 | PNG | `public/icon/128.png` | Exists |
 | Icon 48x48 | PNG | `public/icon/48.png` | Exists |
-| Chrome screenshot 1: Side panel docked | 1280x800 PNG | `assets/store/screenshots/01-chrome-sidepanel.png` | Stale: header changed |
-| Chrome screenshot 2: Settings | 1280x800 PNG | `assets/store/screenshots/02-chrome-settings.png` | Stale: header changed |
-| Chrome screenshot 3: Popout tab | 1280x800 PNG | `assets/store/screenshots/03-chrome-popout.png` | Stale: header changed |
-| Firefox screenshot 1: Sidebar docked | 1280x800 PNG | `assets/store/screenshots/01-firefox-sidepanel.png` | Stale: header changed |
-| Firefox screenshot 2: Settings | 1280x800 PNG | `assets/store/screenshots/02-firefox-settings.png` | Stale: header changed |
-| Firefox screenshot 3: Popout tab | 1280x800 PNG | `assets/store/screenshots/03-firefox-popout.png` | Stale: header changed |
+| Chrome screenshot 1: Side panel docked | 1280x800 PNG | `assets/store/screenshots/01-chrome-sidepanel.png` | Captured |
+| Chrome screenshot 2: Settings | 1280x800 PNG | `assets/store/screenshots/02-chrome-settings.png` | Captured |
+| Chrome screenshot 3: Popout tab | 1280x800 PNG | `assets/store/screenshots/03-chrome-popout.png` | Captured |
+| Firefox screenshot 1: Sidebar docked | 1280x800 PNG | `assets/store/screenshots/01-firefox-sidepanel.png` | Captured |
+| Firefox screenshot 2: Settings | 1280x800 PNG | `assets/store/screenshots/02-firefox-settings.png` | Captured |
+| Firefox screenshot 3: Popout tab | 1280x800 PNG | `assets/store/screenshots/03-firefox-popout.png` | Captured |
 | Chrome small promo tile (optional) | 440x280 PNG | `assets/store/promo-440x280.png` | Skipped |
 | Chrome marquee (optional) | 1400x560 PNG | `assets/store/promo-1400x560.png` | Skipped |
 | AMO icon (used 128x128) | 128x128 PNG | `public/icon/128.png` | Reused |
 
-Screenshots are captured manually with `just dev <browser>` at 1280x800
-plus `Cmd-Shift-4 + Space + Option-click`. Re-run after UI changes that
-affect the visible state.
+Re-run `just store-screenshots` after UI changes that affect the visible
+state. It captures the Saros review by default; pass a URL to use another
+video.
 
 Promo tiles are optional on Chrome Web Store (since 2023). Without them,
 the store falls back to the 128x128 icon -- ordinary category and search
@@ -197,5 +201,5 @@ All processing is client-side. No analytics, no telemetry.
 
 - Permission added or removed -> update the table here, then `wxt.config.ts`
 - Major feature shipped -> revise detailed description before next release
-- Screenshots out of date -> recapture by hand per the asset checklist,
-  run `just normalize-screenshots`, commit the PNGs, mark the table "Captured"
+- Screenshots out of date -> run `just store-screenshots`, review the PNGs,
+  commit them

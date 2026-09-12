@@ -49,7 +49,7 @@ sidepanel, YouTube content scripts, and background worker.
 - `src/entrypoints/popout/` -- popout tab UI (right-click icon -> Open in new tab)
 - `tests/unit/` -- Vitest unit tests
 - `tests/e2e/` -- Playwright E2E tests
-- `tools/` -- smoke-test, debug-firefox, fixture-capture, transcript CLI
+- `tools/` -- smoke-test, debug-firefox, fixture-capture, transcript CLI, store-screenshots
 - `wxt.config.ts` -- manifest, permissions, persistent dev profiles under `.wxt/profiles/`
 - `.github/workflows/ci.yml` -- runs `just check` and E2E on push/PR
 - `.github/workflows/release.yml` -- triggered by `just bump` pushing a tag

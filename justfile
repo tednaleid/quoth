@@ -277,3 +277,12 @@ retag version:
     git tag -d "$tag" || true
     git tag -a "$tag" -F "$notes_file"
     git push && git push --tags
+
+# Capture the store listing screenshots: real browser windows with the docked sidebar at 1280x800.
+# Needs Screen Recording and Accessibility permission for the terminal. Optional URL overrides the video.
+store-screenshots BROWSER="all" *URL:
+    just install-browsers chromium firefox
+    just build chrome
+    just build firefox
+    bun run tools/store-screenshots.ts {{BROWSER}} {{URL}}
+    just normalize-screenshots
