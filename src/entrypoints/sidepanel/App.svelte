@@ -4,8 +4,8 @@
     handleMessage,
     type TranscriptState,
   } from '../../core/message-handler';
-  import { setupTabConnector, listYouTubeTabs } from '../../adapters/browser/tab-connector';
-  import type { YouTubeTabInfo } from '../../ports/tab-connector';
+  import { setupTabConnector } from '../../adapters/browser/tab-connector';
+  import type { TabConnection, YouTubeTabInfo } from '../../ports/tab-connector';
   import { SettingsStorage } from '../../adapters/browser/settings-storage';
   import { copyTextToClipboard } from '../../adapters/browser/clipboard';
   import {
@@ -69,46 +69,19 @@
     }, 2500);
   }
 
-  function connectToTab(tabId: number) {
-    youtubeTabId = tabId;
-    state = { ...createInitialState(), status: 'Loading...' };
-    sendToTab(tabId, { type: 'request-state' });
-  }
+  // The connector owns which tab is connected; the panel only asks it to pin or follow.
+  let connection: TabConnection | null = null;
 
   function handlePinTab(tabId: number) {
     followActive = false;
-    connectToTab(tabId);
+    connection?.pin(tabId);
   }
 
-  async function handleToggleFollow() {
+  function handleToggleFollow() {
     followActive = true;
-    // Reconnect to the active YouTube tab (fall back to the first one).
-    try {
-      const tabs = await listYouTubeTabs();
-      const active = tabs.find((t) => t.active) ?? tabs[0];
-      if (active) connectToTab(active.id);
-    } catch (err) {
-      console.warn('[quoth sidebar] failed to list YouTube tabs:', err);
-    }
-  }
-
-  function handleTabsChanged(tabs: YouTubeTabInfo[]) {
-    availableTabs = tabs;
-    if (youtubeTabId !== null && !tabs.some((t) => t.id === youtubeTabId)) {
-      // Connected tab was closed or navigated away.
-      if (followActive) {
-        const active = tabs.find((t) => t.active) ?? tabs[0];
-        if (active) {
-          connectToTab(active.id);
-        } else {
-          youtubeTabId = null;
-          state = { ...createInitialState(), status: 'No YouTube tabs open' };
-        }
-      } else {
-        youtubeTabId = null;
-        state = { ...createInitialState(), status: 'Pinned tab closed' };
-      }
-    }
+    connection?.follow().catch((err) => {
+      console.warn('[quoth sidebar] failed to follow active tab:', err);
+    });
   }
 
   function buildCopyText(): string {
@@ -179,16 +152,24 @@
 
   setupTabConnector({
     onConnect(tabId) {
-      // Ignore follow-active switches while pinned to a manual selection.
-      if (!followActive) return;
       youtubeTabId = tabId;
       state = { ...createInitialState(), status: 'Loading...' };
     },
     sendMessage(tabId, message) {
       sendToTab(tabId, message);
     },
-    onTabsChanged: handleTabsChanged,
-    isPinned: () => !followActive,
+    onTabsChanged(tabs) {
+      availableTabs = tabs;
+    },
+    onDisconnect(reason) {
+      youtubeTabId = null;
+      state = {
+        ...createInitialState(),
+        status: reason === 'pinned-tab-closed' ? 'Pinned tab closed' : 'No YouTube tabs open',
+      };
+    },
+  }).then((conn) => {
+    connection = conn;
   });
 </script>
 

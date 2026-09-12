@@ -84,21 +84,28 @@ when empty).
 
 Wiring:
 
-- `src/ports/tab-connector.ts` — new `YouTubeTabInfo { id, title, url, active }`,
-  optional `onTabsChanged(tabs)` and `isPinned()` callbacks (both optional, so
-  existing callers are unaffected).
-- `src/adapters/browser/tab-connector.ts` — new `listYouTubeTabs()` (queries
-  all tabs, filters by the watch-URL regex; no new permissions needed since
-  `tabs` + youtube host permissions already expose url/title). `setupTabConnector`
-  emits the list on startup, activation, update, and removal, and suppresses
-  auto-switch while `isPinned()`. Manual selection reuses the existing
+- `src/ports/tab-connector.ts` — `YouTubeTabInfo { id, title, url, active }`,
+  optional `onTabsChanged(tabs)` and `onDisconnect(reason)` callbacks, and a
+  `TabConnection` handle (`pin(tabId)`, `follow()`, `cleanup()`) returned by
+  `setupTabConnector`.
+- `src/adapters/browser/tab-connector.ts` — the connector is the single owner
+  of which tab is connected and whether it is following the active tab.
+  `listYouTubeTabs()` queries all tabs and filters by the watch-URL regex (no
+  new permissions needed since `tabs` + youtube host permissions already
+  expose url/title). The connector emits the list on startup, activation,
+  update, and removal. `pin(tabId)` connects to that tab and stops following;
+  `follow()` resumes following and reconnects to the active YouTube tab if
+  there is one, otherwise stays put. When the connected tab closes or leaves
+  YouTube, a following connector moves to the active (else first) remaining
+  YouTube tab or reports `no-tabs`; a pinned connector reports
+  `pinned-tab-closed` and waits. Every connection goes through the same
   `onConnect` + `request-state` path, so the content script refetches (or
   replays — see §4).
 - `src/entrypoints/sidepanel/components/TabSelector.svelte` — dropdown +
-  follow/pin toggle. `App.svelte` owns `availableTabs`, `followActive`, and
-  `youtubeTabId`; if the connected tab closes or navigates away while pinned
-  it shows "Pinned tab closed", while following it falls through to another
-  tab or "No YouTube tabs open".
+  follow/pin toggle. `App.svelte` mirrors `availableTabs` and `youtubeTabId`
+  from the connector callbacks, keeps `followActive` only for rendering the
+  toggle, and maps `onDisconnect` reasons to the "Pinned tab closed" and "No
+  YouTube tabs open" statuses.
 
 ## 4. Fast tab switching (replay cache)
 
@@ -129,10 +136,11 @@ it is the natural next step.
 
 ## 5. Testing
 
-- **Unit (Vitest, 180 passing):** `transcript-export` (all three formats,
+- **Unit (Vitest):** `transcript-export` (all three formats,
   hour timestamps, empty input), `click-guard` (plain click seeks; selection
   or drag does not), `replay` (replay/refetch matrix), `tab-connector`
-  (`listYouTubeTabs` filtering, `onTabsChanged` emission, pin suppression),
+  (`listYouTubeTabs` filtering, `onTabsChanged` emission, pin/follow cycles,
+  connected tab closing while following or pinned),
   settings + settings-storage migration (old saves gain `mode`/`copyFormat`
   defaults).
 - **Smoke:** `just smoke-test firefox` (sidepanel + popout mount in Gecko;
