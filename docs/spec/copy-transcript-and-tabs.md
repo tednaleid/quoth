@@ -61,17 +61,19 @@ update. No new host permissions; everything stays on youtube.com.
 
 ## 3. YouTube tab selector
 
-The sidebar follows the active YouTube tab by default. When two or more
-`youtube.com/watch` tabs are open, the header title becomes a dropdown
-listing them by full title with the connected one checked, and a pin button
-appears at the left edge of the header. With a single tab neither control is
-shown and the header looks the same as it did before tab switching existed.
+The sidebar follows the active YouTube tab by default. The header title is
+always a dropdown listing the open `youtube.com/watch` tabs by full title
+with the connected one checked, and a pin button always sits at the left
+edge of the header, so a tab can be pinned before a second one is opened.
 
 - **Follow-active (default):** activating or navigating a YouTube tab
   switches the sidebar to it.
 - **Pinned:** picking a tab from the title dropdown, or clicking the pin,
   pins the sidebar to that tab; background tab activity no longer switches.
   Clicking the pin again resumes following and reconnects to the active tab.
+- **Connected tab closes:** the last transcript stays on screen, dimmed,
+  with the status "Pinned tab closed" or "YouTube tab closed". The dropdown
+  lists only tabs that are still open. Picking one, or unpinning, reconnects.
 
 Wiring:
 
@@ -93,11 +95,12 @@ Wiring:
   `onConnect` + `request-state` path, so the content script refetches (or
   replays — see §4).
 - `src/entrypoints/sidepanel/components/Header.svelte` — renders the pin
-  button and the title dropdown (a `Menu.svelte` in its title variant) when
-  it receives more than one tab. `App.svelte` mirrors `availableTabs` and
-  `youtubeTabId` from the connector callbacks, keeps `followActive` only for
-  rendering the pin, and maps `onDisconnect` reasons to the "Pinned tab
-  closed" and "No YouTube tabs open" statuses.
+  button and the title dropdown (a `Menu.svelte` in its title variant)
+  whenever it is given the pin and select callbacks. `App.svelte` mirrors
+  `availableTabs` and `youtubeTabId` from the connector callbacks, keeps
+  `followActive` only for rendering the pin, and on `onDisconnect` keeps the
+  transcript, dims the page, and sets the "Pinned tab closed" or "YouTube
+  tab closed" status.
 
 ## 4. Fast tab switching (replay cache)
 

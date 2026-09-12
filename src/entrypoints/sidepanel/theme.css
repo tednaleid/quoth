@@ -10,8 +10,8 @@
   --text-very-dim: #556;
   --text-very-dim-hover: #88a;
   --border-dim: #2a2a4a;
-  --button-border: #333;
-  --button-border-active: #446;
+  --button-border: #4a4d63;
+  --button-border-active: #6b6f8a;
   --button-text-active: #aac;
   --chapter-link: #c0c8e0;
   --chapter-link-hover: #e0e8ff;
@@ -25,8 +25,8 @@
     --text-very-dim: #99a;
     --text-very-dim-hover: #556;
     --border-dim: #dde;
-    --button-border: #ccd;
-    --button-border-active: #99a;
+    --button-border: #b8bcc8;
+    --button-border-active: #7a7f94;
     --button-text-active: #334;
     --chapter-link: #3a4a7a;
     --chapter-link-hover: #1a2340;
@@ -46,6 +46,10 @@ main.app {
   background: var(--bg);
   font-size: 16px;
   position: relative;
+}
+
+main.app.disconnected {
+  opacity: 0.6;
 }
 
 .placeholder {

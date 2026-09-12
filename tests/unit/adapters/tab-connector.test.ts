@@ -483,6 +483,26 @@ describe('setupTabConnector - connected tab goes away', () => {
     conn.cleanup();
   });
 
+  it('drops a closed tab even when the browser still lists it during the removal event', async () => {
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=xyz' });
+
+    const onConnect = vi.fn();
+    const onTabsChanged = vi.fn();
+    const conn = await setupTabConnector({ onConnect, onTabsChanged });
+    onConnect.mockClear();
+    onTabsChanged.mockClear();
+
+    // Firefox can fire onRemoved before tabs.query stops returning the tab.
+    await fakeBrowser.tabs.onRemoved.trigger(1, { isWindowClosing: false, windowId: 0 });
+
+    expect(onTabsChanged).toHaveBeenCalledOnce();
+    expect(onTabsChanged.mock.calls[0][0].map((t: { id: number }) => t.id)).toEqual([2]);
+    expect(onConnect).toHaveBeenCalledWith(2);
+
+    conn.cleanup();
+  });
+
   it('reports no-tabs when the last YouTube tab closes', async () => {
     await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
 

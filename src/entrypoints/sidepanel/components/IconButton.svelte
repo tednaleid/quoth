@@ -37,6 +37,7 @@
   .toggle.active {
     color: var(--button-text-active);
     border-color: var(--button-border-active);
+    background: var(--segment-hover);
   }
   .toggle:disabled {
     opacity: 0.4;

@@ -62,8 +62,10 @@ export const setupTabConnector: TabConnector = async (callbacks: TabConnectorCal
   }
 
   // Re-emits the tab list and handles the connected tab disappearing from it.
-  async function refreshTabs(): Promise<void> {
-    const tabs = await listYouTubeTabs();
+  // A tab being removed is excluded explicitly because Firefox can still
+  // return it from tabs.query while the removal event is being handled.
+  async function refreshTabs(removedTabId: number | null = null): Promise<void> {
+    const tabs = (await listYouTubeTabs()).filter((t) => t.id !== removedTabId);
     if (callbacks.onTabsChanged) {
       callbacks.onTabsChanged(tabs);
     }
@@ -99,8 +101,8 @@ export const setupTabConnector: TabConnector = async (callbacks: TabConnectorCal
     }
   };
 
-  const onRemoved = async () => {
-    await refreshTabs();
+  const onRemoved = async (removedTabId: number) => {
+    await refreshTabs(removedTabId);
   };
 
   browser.tabs.onActivated.addListener(onActivated);

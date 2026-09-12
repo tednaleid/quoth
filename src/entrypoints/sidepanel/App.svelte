@@ -32,6 +32,8 @@
   // Follow-active (default) vs pinned to a manually selected tab.
   let followActive = $state(true);
   let availableTabs: YouTubeTabInfo[] = $state([]);
+  // The connected tab closed or left YouTube; the last transcript stays visible but dimmed.
+  let disconnected = $state(false);
 
   // Load + persist user highlight settings via browser.storage.local.
   const settingsStorage = new SettingsStorage(browser.storage.local);
@@ -119,6 +121,7 @@
   setupTabConnector({
     onConnect(tabId) {
       youtubeTabId = tabId;
+      disconnected = false;
       state = { ...createInitialState(), status: 'Loading...' };
     },
     sendMessage(tabId, message) {
@@ -129,9 +132,11 @@
     },
     onDisconnect(reason) {
       youtubeTabId = null;
+      disconnected = true;
       state = {
-        ...createInitialState(),
-        status: reason === 'pinned-tab-closed' ? 'Pinned tab closed' : 'No YouTube tabs open',
+        ...state,
+        currentTimeMs: 0,
+        status: reason === 'pinned-tab-closed' ? 'Pinned tab closed' : 'YouTube tab closed',
       };
     },
   }).then((conn) => {
@@ -141,6 +146,7 @@
 
 <main
   class="app"
+  class:disconnected
   style:--bg={settings.bg}
   style:--text={settings.text}
   style:--horizon-rgb={hexToRgbString(settings.peak)}
@@ -153,9 +159,10 @@
       autoScroll = !autoScroll;
       if (autoScroll) forceSnapToken++;
     }}
-    settingsOpen
+    {settingsOpen}
     onToggleSettings={() => (settingsOpen = !settingsOpen)}
     onPopout={handlePopout}
+    {disconnected}
     tabs={availableTabs}
     selectedTabId={youtubeTabId}
     {followActive}

@@ -17,7 +17,7 @@
     settingsOpen: boolean;
     onPopout?: () => void;
     disconnected?: boolean;
-    /** Open YouTube tabs. With more than one, the title becomes a tab picker and the pin appears. */
+    /** Open YouTube tabs for the title picker. The picker and pin render whenever their callbacks are given. */
     tabs?: YouTubeTabInfo[];
     selectedTabId?: number | null;
     followActive?: boolean;
@@ -43,14 +43,13 @@
     copyDisabled = false,
   }: Props = $props();
 
-  let multipleTabs = $derived(tabs.length > 1);
   let tabItems = $derived(
     tabs.map((t) => ({ id: String(t.id), label: t.title, selected: t.id === selectedTabId })),
   );
 </script>
 
 <header>
-  {#if multipleTabs && onToggleFollow}
+  {#if onToggleFollow}
     <IconButton
       active={!followActive}
       onclick={onToggleFollow}
@@ -84,7 +83,7 @@
   {/if}
 
   <h1 class:disconnected>
-    {#if multipleTabs && onSelectTab}
+    {#if onSelectTab}
       <Menu
         variant="title"
         items={tabItems}

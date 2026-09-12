@@ -121,7 +121,7 @@
       autoScroll = !autoScroll;
       if (autoScroll) forceSnapToken++;
     }}
-    settingsOpen
+    {settingsOpen}
     onToggleSettings={() => (settingsOpen = !settingsOpen)}
     {disconnected}
     onCopy={handleCopy}
@@ -154,9 +154,3 @@
 
   <StatusBar status={state.status} />
 </main>
-
-<style>
-  main.disconnected {
-    opacity: 0.6;
-  }
-</style>
