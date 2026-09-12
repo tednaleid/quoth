@@ -71,6 +71,12 @@ await page.addInitScript(() => {
       onRemoved: stubListener,
       onUpdated: stubListener,
     },
+    storage: {
+      local: {
+        get: () => Promise.resolve({}),
+        set: promiseResolve,
+      },
+    },
   };
 });
 

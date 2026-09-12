@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { CopyFormat, TranscriptMode } from '../../../core/settings';
+
   interface Props {
     title: string;
     autoScroll: boolean;
@@ -7,6 +9,12 @@
     settingsOpen: boolean;
     onPopout?: () => void;
     disconnected?: boolean;
+    mode?: TranscriptMode;
+    onToggleMode?: () => void;
+    copyFormat?: CopyFormat;
+    onCopyFormatChange?: (format: CopyFormat) => void;
+    onCopy?: () => void;
+    copyDisabled?: boolean;
   }
   let {
     title,
@@ -16,12 +24,53 @@
     settingsOpen,
     onPopout,
     disconnected,
+    mode = 'seek',
+    onToggleMode,
+    copyFormat = 'markdown',
+    onCopyFormatChange,
+    onCopy,
+    copyDisabled = false,
   }: Props = $props();
 </script>
 
 <header>
   <h1 class:disconnected>{title || 'Quoth'}</h1>
   <div class="controls">
+    {#if onToggleMode}
+      <button
+        class="toggle"
+        class:active={mode === 'copy'}
+        onclick={onToggleMode}
+        title={mode === 'copy'
+          ? 'Copy mode: text selection on, seek off'
+          : 'Seek mode: click text to seek'}
+        aria-label="Toggle seek/copy mode"
+      >
+        {mode === 'copy' ? '📋' : '🔍'}
+      </button>
+    {/if}
+    {#if onCopy}
+      <select
+        class="format"
+        value={copyFormat}
+        onchange={(e) => onCopyFormatChange?.(e.currentTarget.value as CopyFormat)}
+        title="Copy format"
+        aria-label="Copy format"
+      >
+        <option value="markdown">MD links</option>
+        <option value="timestamps">Timestamps</option>
+        <option value="plain">Plain</option>
+      </select>
+      <button
+        class="toggle"
+        onclick={onCopy}
+        disabled={copyDisabled}
+        title="Copy transcript to clipboard"
+        aria-label="Copy transcript"
+      >
+        Copy
+      </button>
+    {/if}
     <button
       class="toggle"
       class:active={settingsOpen}
@@ -112,6 +161,20 @@
   .toggle.active {
     color: var(--button-text-active);
     border-color: var(--button-border-active);
+  }
+  .toggle:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .format {
+    background: none;
+    border: 1px solid var(--button-border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 12px;
+    max-width: 92px;
   }
   h1.disconnected {
     color: var(--text-dimmer);

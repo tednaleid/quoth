@@ -134,10 +134,6 @@ transcript *ARGS:
 punct-explore *ARGS:
     ./tools/punct-explore.py {{ARGS}}
 
-# Run model comparison harness against transcript fixtures
-model-bench *ARGS:
-    bun run tools/model-bench/bench.ts {{ARGS}}
-
 # Capture YouTube page fixture for testing
 fixture-capture URL *NAME:
     bun run tools/fixture-capture.ts "{{URL}}" {{NAME}}

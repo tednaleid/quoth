@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fakeBrowser } from 'wxt/testing';
-import { setupTabConnector } from '../../../src/adapters/browser/tab-connector';
+import { setupTabConnector, listYouTubeTabs } from '../../../src/adapters/browser/tab-connector';
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -277,6 +277,77 @@ describe('setupTabConnector - sendMessage', () => {
     const cleanup = await setupTabConnector({ onConnect, sendMessage });
 
     expect(sendMessage).not.toHaveBeenCalled();
+
+    cleanup();
+  });
+});
+
+describe('listYouTubeTabs', () => {
+  it('returns id, title, and url for each open YouTube tab', async () => {
+    await fakeBrowser.tabs.create({
+      url: 'https://www.youtube.com/watch?v=abc',
+      title: 'Video ABC',
+    });
+    await fakeBrowser.tabs.create({ url: 'https://www.example.com/' });
+    await fakeBrowser.tabs.create({
+      url: 'https://www.youtube.com/watch?v=xyz',
+      title: 'Video XYZ',
+    });
+
+    const tabs = await listYouTubeTabs();
+
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toMatchObject({
+      id: 1,
+      url: 'https://www.youtube.com/watch?v=abc',
+    });
+    expect(tabs[1]).toMatchObject({
+      id: 3,
+      url: 'https://www.youtube.com/watch?v=xyz',
+    });
+  });
+
+  it('returns an empty list when no YouTube tabs are open', async () => {
+    await fakeBrowser.tabs.create({ url: 'https://www.example.com/' });
+
+    expect(await listYouTubeTabs()).toEqual([]);
+  });
+});
+
+describe('setupTabConnector - tab list updates', () => {
+  it('emits the tab list on connect via onTabsChanged', async () => {
+    await fakeBrowser.tabs.create({
+      url: 'https://www.youtube.com/watch?v=abc',
+      title: 'Video ABC',
+    });
+
+    const onConnect = vi.fn();
+    const onTabsChanged = vi.fn();
+    const cleanup = await setupTabConnector({ onConnect, onTabsChanged });
+
+    expect(onTabsChanged).toHaveBeenCalledOnce();
+    expect(onTabsChanged.mock.calls[0][0]).toHaveLength(1);
+    expect(onTabsChanged.mock.calls[0][0][0]).toMatchObject({ id: 1 });
+
+    cleanup();
+  });
+
+  it('does not auto-switch tabs while pinned', async () => {
+    await fakeBrowser.tabs.create({
+      url: 'https://www.youtube.com/watch?v=abc',
+    });
+    const second = await fakeBrowser.tabs.create({
+      url: 'https://www.youtube.com/watch?v=xyz',
+    });
+
+    const onConnect = vi.fn();
+    // Pinned: manual tab selection suppresses follow-active switching.
+    const cleanup = await setupTabConnector({ onConnect, isPinned: () => true });
+    onConnect.mockClear();
+
+    await fakeBrowser.tabs.onActivated.trigger({ tabId: second.id!, windowId: 1 });
+
+    expect(onConnect).not.toHaveBeenCalled();
 
     cleanup();
   });

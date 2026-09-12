@@ -4,14 +4,27 @@
     handleMessage,
     type TranscriptState,
   } from '../../core/message-handler';
-  import { setupTabConnector } from '../../adapters/browser/tab-connector';
+  import { setupTabConnector, listYouTubeTabs } from '../../adapters/browser/tab-connector';
+  import type { YouTubeTabInfo } from '../../ports/tab-connector';
   import { SettingsStorage } from '../../adapters/browser/settings-storage';
-  import { DEFAULT_SETTINGS, hexToRgbString, type HighlightSettings } from '../../core/settings';
+  import { copyTextToClipboard } from '../../adapters/browser/clipboard';
+  import {
+    formatPlainText,
+    formatWithTimestamps,
+    formatWithMarkdownLinks,
+  } from '../../core/transcript-export';
+  import {
+    DEFAULT_SETTINGS,
+    hexToRgbString,
+    type CopyFormat,
+    type HighlightSettings,
+  } from '../../core/settings';
   import type { ContentMessage, SidePanelMessage } from '../../messages';
   import { isSeek } from '../../core/seek-detector';
   import Header from './components/Header.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
   import StatusBar from './components/StatusBar.svelte';
+  import TabSelector from './components/TabSelector.svelte';
   import TranscriptView from './components/TranscriptView.svelte';
 
   let state: TranscriptState = $state(createInitialState());
@@ -23,6 +36,11 @@
 
   // Track the YouTube tab we're connected to (for message filtering and seeking)
   let youtubeTabId: number | null = $state(null);
+  // Follow-active (default) vs pinned to a manually selected tab.
+  let followActive = $state(true);
+  let availableTabs: YouTubeTabInfo[] = $state([]);
+  let toast: { message: string; error: boolean } | null = $state(null);
+  let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Load + persist user highlight settings via browser.storage.local.
   const settingsStorage = new SettingsStorage(browser.storage.local);
@@ -40,6 +58,79 @@
     settingsStorage.save(next).catch((err) => {
       console.warn('[quoth sidebar] failed to save settings:', err);
     });
+  }
+
+  function showToast(message: string, error = false) {
+    if (toastTimer) clearTimeout(toastTimer);
+    toast = { message, error };
+    toastTimer = setTimeout(() => {
+      toast = null;
+      toastTimer = null;
+    }, 2500);
+  }
+
+  function connectToTab(tabId: number) {
+    youtubeTabId = tabId;
+    state = { ...createInitialState(), status: 'Loading...' };
+    sendToTab(tabId, { type: 'request-state' });
+  }
+
+  function handlePinTab(tabId: number) {
+    followActive = false;
+    connectToTab(tabId);
+  }
+
+  async function handleToggleFollow() {
+    followActive = true;
+    // Reconnect to the active YouTube tab (fall back to the first one).
+    try {
+      const tabs = await listYouTubeTabs();
+      const active = tabs.find((t) => t.active) ?? tabs[0];
+      if (active) connectToTab(active.id);
+    } catch (err) {
+      console.warn('[quoth sidebar] failed to list YouTube tabs:', err);
+    }
+  }
+
+  function handleTabsChanged(tabs: YouTubeTabInfo[]) {
+    availableTabs = tabs;
+    if (youtubeTabId !== null && !tabs.some((t) => t.id === youtubeTabId)) {
+      // Connected tab was closed or navigated away.
+      if (followActive) {
+        const active = tabs.find((t) => t.active) ?? tabs[0];
+        if (active) {
+          connectToTab(active.id);
+        } else {
+          youtubeTabId = null;
+          state = { ...createInitialState(), status: 'No YouTube tabs open' };
+        }
+      } else {
+        youtubeTabId = null;
+        state = { ...createInitialState(), status: 'Pinned tab closed' };
+      }
+    }
+  }
+
+  function buildCopyText(): string {
+    const { words, segments } = state;
+    const videoId = state.videoInfo?.videoId ?? '';
+    if (settings.copyFormat === 'plain') return formatPlainText(words, segments);
+    if (settings.copyFormat === 'timestamps') return formatWithTimestamps(words, segments);
+    return formatWithMarkdownLinks(words, segments, videoId);
+  }
+
+  async function handleCopy() {
+    if (state.words.length === 0) {
+      showToast('Nothing to copy yet', true);
+      return;
+    }
+    try {
+      await copyTextToClipboard(buildCopyText());
+      showToast('Transcript copied to clipboard!');
+    } catch (err) {
+      console.warn('[quoth sidebar] copy failed:', err);
+      showToast('Copy failed — select the text manually', true);
+    }
   }
 
   // Only handle messages from the tab we're connected to
@@ -70,6 +161,8 @@
   }
 
   function handleSeek(timeMs: number) {
+    // Copy mode renders no seek targets, but guard anyway.
+    if (settings.mode === 'copy') return;
     if (youtubeTabId) {
       sendToTab(youtubeTabId, { type: 'seek-to', timeMs });
     }
@@ -86,12 +179,16 @@
 
   setupTabConnector({
     onConnect(tabId) {
+      // Ignore follow-active switches while pinned to a manual selection.
+      if (!followActive) return;
       youtubeTabId = tabId;
       state = { ...createInitialState(), status: 'Loading...' };
     },
     sendMessage(tabId, message) {
       sendToTab(tabId, message);
     },
+    onTabsChanged: handleTabsChanged,
+    isPinned: () => !followActive,
   });
 </script>
 
@@ -111,6 +208,21 @@
     settingsOpen
     onToggleSettings={() => (settingsOpen = !settingsOpen)}
     onPopout={handlePopout}
+    mode={settings.mode}
+    onToggleMode={() =>
+      updateSettings({ ...settings, mode: settings.mode === 'copy' ? 'seek' : 'copy' })}
+    copyFormat={settings.copyFormat}
+    onCopyFormatChange={(format: CopyFormat) => updateSettings({ ...settings, copyFormat: format })}
+    onCopy={handleCopy}
+    copyDisabled={state.words.length === 0}
+  />
+
+  <TabSelector
+    tabs={availableTabs}
+    selectedTabId={youtubeTabId}
+    {followActive}
+    onSelectTab={handlePinTab}
+    onToggleFollow={handleToggleFollow}
   />
 
   <SettingsPanel {settings} open={settingsOpen} onChange={updateSettings} />
@@ -128,10 +240,17 @@
       horizonSeconds={settings.horizonSeconds}
       onSeek={handleSeek}
       onAutoScrollDisable={() => (autoScroll = false)}
+      mode={settings.mode}
     />
   {:else}
     <div class="placeholder">
       <p>{state.status}</p>
+    </div>
+  {/if}
+
+  {#if toast}
+    <div class="toast" class:error={toast.error} role="status">
+      {toast.message}
     </div>
   {/if}
 
@@ -185,6 +304,7 @@
     color: var(--text);
     background: var(--bg);
     font-size: 16px;
+    position: relative;
   }
 
   .placeholder {
@@ -194,5 +314,23 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .toast {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+    z-index: 10;
+  }
+
+  .toast.error {
+    background: #7a2a2a;
   }
 </style>
