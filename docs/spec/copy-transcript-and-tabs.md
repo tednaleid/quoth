@@ -25,10 +25,13 @@ selection.
 
 ## 2. Copy Transcript button
 
-Header controls: a format `<select>` (MD links / Timestamps / Plain) plus a
-Copy button, disabled while no transcript is loaded. On success a toast shows
-"Transcript copied to clipboard!" (~2.5s); on failure it suggests manual
-selection. Copy of an empty transcript toasts "Nothing to copy yet".
+Header control: a copy icon that opens a menu of three actions (Plain text,
+With timestamps, Markdown with timestamp links), each of which copies
+immediately. Nothing about the format is persisted. The menu is disabled
+while no transcript is loaded. On success a toast below the header shows
+"Transcript copied to clipboard" (~2.5s); on failure it suggests manual
+selection. The same copy flow and toast are shared with the popout page via
+`src/entrypoints/sidepanel/copy-transcript.ts` and `toast.svelte.ts`.
 
 Formats (paragraphs joined by blank lines), all pure functions in
 `src/core/transcript-export.ts`:
@@ -58,17 +61,17 @@ update. No new host permissions; everything stays on youtube.com.
 
 ## 3. YouTube tab selector
 
-Previously the sidebar auto-followed the last-activated YouTube tab with no
-way to choose. Now a dropdown under the header lists all open
-`youtube.com/watch` tabs (`●` marks the connected one; "No YouTube tabs open"
-when empty).
+The sidebar follows the active YouTube tab by default. When two or more
+`youtube.com/watch` tabs are open, the header title becomes a dropdown
+listing them by full title with the connected one checked, and a pin button
+appears at the left edge of the header. With a single tab neither control is
+shown and the header looks the same as it did before tab switching existed.
 
-- **Follow-active (default, 🔓):** current behavior — activating/navigating a
-  YouTube tab switches the sidebar to it.
-- **Pinned (📌):** picking a tab from the dropdown pins the sidebar to it;
-  background tab activity no longer switches. Clicking 🔓 resumes following
-  and reconnects to the active tab.
-- Duplicate titles are disambiguated by video ID via `core/youtube.ts`.
+- **Follow-active (default):** activating or navigating a YouTube tab
+  switches the sidebar to it.
+- **Pinned:** picking a tab from the title dropdown, or clicking the pin,
+  pins the sidebar to that tab; background tab activity no longer switches.
+  Clicking the pin again resumes following and reconnects to the active tab.
 
 Wiring:
 
@@ -89,11 +92,12 @@ Wiring:
   `pinned-tab-closed` and waits. Every connection goes through the same
   `onConnect` + `request-state` path, so the content script refetches (or
   replays — see §4).
-- `src/entrypoints/sidepanel/components/TabSelector.svelte` — dropdown +
-  follow/pin toggle. `App.svelte` mirrors `availableTabs` and `youtubeTabId`
-  from the connector callbacks, keeps `followActive` only for rendering the
-  toggle, and maps `onDisconnect` reasons to the "Pinned tab closed" and "No
-  YouTube tabs open" statuses.
+- `src/entrypoints/sidepanel/components/Header.svelte` — renders the pin
+  button and the title dropdown (a `Menu.svelte` in its title variant) when
+  it receives more than one tab. `App.svelte` mirrors `availableTabs` and
+  `youtubeTabId` from the connector callbacks, keeps `followActive` only for
+  rendering the pin, and maps `onDisconnect` reasons to the "Pinned tab
+  closed" and "No YouTube tabs open" statuses.
 
 ## 4. Fast tab switching (replay cache)
 

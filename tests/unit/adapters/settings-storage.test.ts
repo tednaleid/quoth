@@ -23,7 +23,6 @@ const customSettings: HighlightSettings = {
   current: '#ffffff',
   peakCap: 0.65,
   horizonSeconds: 12,
-  copyFormat: 'plain',
 };
 
 describe('SettingsStorage', () => {
@@ -69,7 +68,7 @@ describe('SettingsStorage', () => {
     expect(loaded.bg).toBe(DEFAULT_SETTINGS.bg);
     expect(loaded.text).toBe(DEFAULT_SETTINGS.text);
     expect(loaded.current).toBe(DEFAULT_SETTINGS.current);
-    // New fields added after the save also fall back to defaults.
-    expect(loaded.copyFormat).toBe(DEFAULT_SETTINGS.copyFormat);
+    // Fields added after the save also fall back to defaults.
+    expect(loaded.horizonSeconds).toBe(DEFAULT_SETTINGS.horizonSeconds);
   });
 });

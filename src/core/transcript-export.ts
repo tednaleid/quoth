@@ -6,6 +6,9 @@ import type { Chapter, TimedWord, VideoInfo } from './types';
 import { assignChaptersToSegments, type WordSegment } from './playback-sync';
 import { formatTime, timeToSeconds } from './time-format';
 
+/** Copy-to-clipboard format: markdown document, plain [m:ss] timestamps, or plain text. */
+export type CopyFormat = 'markdown' | 'timestamps' | 'plain';
+
 function paragraphText(words: TimedWord[], startIndex: number, endIndex: number): string {
   return words
     .slice(startIndex, endIndex + 1)
@@ -59,4 +62,21 @@ export function formatMarkdown(
     );
   });
   return blocks.join('\n\n');
+}
+
+/**
+ * Formats the transcript in the requested format. Markdown needs the video
+ * metadata for its links and header, so without it the timestamps format is
+ * used instead.
+ */
+export function formatTranscript(
+  format: CopyFormat,
+  words: TimedWord[],
+  segments: WordSegment[],
+  chapters: Chapter[],
+  videoInfo: VideoInfo | null,
+): string {
+  if (format === 'plain') return formatPlainText(words, segments);
+  if (format === 'timestamps' || !videoInfo) return formatWithTimestamps(words, segments);
+  return formatMarkdown(words, segments, chapters, videoInfo);
 }

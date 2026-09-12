@@ -15,14 +15,16 @@ function isYouTubeTab(tab: Browser.tabs.Tab): boolean {
   return !!tab.url?.match(YOUTUBE_WATCH_PATTERN);
 }
 
-/** Lists all open YouTube watch tabs for the tab selector UI. */
+const TAB_TITLE_SUFFIX = / - YouTube$/;
+
+/** Lists all open YouTube watch tabs for the tab picker, with the browser's " - YouTube" suffix removed. */
 export async function listYouTubeTabs(): Promise<YouTubeTabInfo[]> {
   const tabs = await browser.tabs.query({});
   return tabs
     .filter((tab) => tab.id !== undefined && isYouTubeTab(tab))
     .map((tab) => ({
       id: tab.id as number,
-      title: tab.title || tab.url || 'YouTube',
+      title: (tab.title || tab.url || 'YouTube').replace(TAB_TITLE_SUFFIX, ''),
       url: tab.url || '',
       active: !!tab.active,
     }));

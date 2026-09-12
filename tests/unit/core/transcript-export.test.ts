@@ -7,6 +7,7 @@ import {
   formatPlainText,
   formatWithTimestamps,
   formatMarkdown,
+  formatTranscript,
 } from '../../../src/core/transcript-export';
 import type { Chapter, TimedWord, VideoInfo } from '../../../src/core/types';
 import type { WordSegment } from '../../../src/core/playback-sync';
@@ -77,6 +78,26 @@ describe('formatMarkdown', () => {
         '[Video](https://youtube.com/watch?v=abc123) | Some Channel | 45:23\n\n' +
         '[0:00](https://youtube.com/watch?v=abc123&t=0) Hello world.\n\n' +
         '[1:01](https://youtube.com/watch?v=abc123&t=61) Second para.',
+    );
+  });
+});
+
+describe('formatTranscript', () => {
+  it('dispatches to the plain, timestamps, and markdown formatters', () => {
+    expect(formatTranscript('plain', words, segments, chapters, videoInfo)).toBe(
+      formatPlainText(words, segments),
+    );
+    expect(formatTranscript('timestamps', words, segments, chapters, videoInfo)).toBe(
+      formatWithTimestamps(words, segments),
+    );
+    expect(formatTranscript('markdown', words, segments, chapters, videoInfo)).toBe(
+      formatMarkdown(words, segments, chapters, videoInfo),
+    );
+  });
+
+  it('falls back to timestamps for markdown when video metadata is missing', () => {
+    expect(formatTranscript('markdown', words, segments, chapters, null)).toBe(
+      formatWithTimestamps(words, segments),
     );
   });
 });

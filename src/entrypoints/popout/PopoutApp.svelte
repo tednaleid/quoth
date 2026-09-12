@@ -9,9 +9,13 @@
   import { DEFAULT_SETTINGS, hexToRgbString, type HighlightSettings } from '../../core/settings';
   import type { ContentMessage, SidePanelMessage } from '../../messages';
   import { isSeek } from '../../core/seek-detector';
+  import type { CopyFormat } from '../../core/transcript-export';
+  import { copyTranscript } from '../sidepanel/copy-transcript';
+  import { createToast } from '../sidepanel/toast.svelte';
   import Header from '../sidepanel/components/Header.svelte';
   import SettingsPanel from '../sidepanel/components/SettingsPanel.svelte';
   import StatusBar from '../sidepanel/components/StatusBar.svelte';
+  import Toast from '../sidepanel/components/Toast.svelte';
   import TranscriptView from '../sidepanel/components/TranscriptView.svelte';
 
   interface Props {
@@ -26,6 +30,7 @@
   let settingsOpen = $state(false);
   let lastTimeMs: number | null = $state(null);
   let forceSnapToken = $state(0);
+  const toast = createToast();
 
   const settingsStorage = new SettingsStorage(browser.storage.local);
   settingsStorage
@@ -79,6 +84,10 @@
     forceSnapToken++;
   }
 
+  function handleCopy(format: CopyFormat) {
+    void copyTranscript(state, format, toast, '[quoth popout]');
+  }
+
   setupPinnedTabConnector(pinnedTabId, {
     onConnect(_tabId) {
       state = { ...createInitialState(), status: 'Loading...' };
@@ -98,6 +107,7 @@
 </script>
 
 <main
+  class="app"
   class:disconnected
   style:--bg={settings.bg}
   style:--text={settings.text}
@@ -114,6 +124,8 @@
     settingsOpen
     onToggleSettings={() => (settingsOpen = !settingsOpen)}
     {disconnected}
+    onCopy={handleCopy}
+    copyDisabled={state.words.length === 0}
   />
 
   <SettingsPanel {settings} open={settingsOpen} onChange={updateSettings} />
@@ -138,33 +150,13 @@
     </div>
   {/if}
 
+  <Toast toast={toast.current} />
+
   <StatusBar status={state.status} />
 </main>
 
 <style>
-  main {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    font-family:
-      system-ui,
-      -apple-system,
-      sans-serif;
-    color: var(--text);
-    background: var(--bg);
-    font-size: 16px;
-  }
-
   main.disconnected {
     opacity: 0.6;
-  }
-
-  .placeholder {
-    flex: 1;
-    padding: 12px;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 </style>

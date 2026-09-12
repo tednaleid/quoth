@@ -336,6 +336,17 @@ describe('listYouTubeTabs', () => {
     });
   });
 
+  it('strips the " - YouTube" suffix from tab titles', async () => {
+    await fakeBrowser.tabs.create({ url: 'https://www.youtube.com/watch?v=abc' });
+    await fakeBrowser.tabs.update(1, {
+      title: 'Video ABC - YouTube',
+    } as Browser.tabs.UpdateProperties);
+
+    const tabs = await listYouTubeTabs();
+
+    expect(tabs[0].title).toBe('Video ABC');
+  });
+
   it('returns an empty list when no YouTube tabs are open', async () => {
     await fakeBrowser.tabs.create({ url: 'https://www.example.com/' });
 
