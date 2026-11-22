@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.60.0",
+    "@playwright/test": "^1.65.1",
     "@testing-library/svelte": "^5.3.1",
     "@tsconfig/svelte": "^5.0.8",
     "@wxt-dev/module-svelte": "^2.0.5",
