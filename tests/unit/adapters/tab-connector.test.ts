@@ -15,26 +15,19 @@ beforeEach(() => {
 // tabs.remove crashes, so these helpers emulate both through tabs.query.
 function makeActive(tabId: number) {
   const original = fakeBrowser.tabs.query.bind(fakeBrowser.tabs);
-  vi.spyOn(fakeBrowser.tabs, 'query').mockImplementation(
-    async (queryInfo: Browser.tabs.QueryInfo) => {
-      const tabs = (await original({ ...queryInfo, active: undefined })).map(
-        (t: Browser.tabs.Tab) => ({
-          ...t,
-          active: t.id === tabId,
-        }),
-      );
-      return queryInfo.active == null
-        ? tabs
-        : tabs.filter((t: Browser.tabs.Tab) => t.active === queryInfo.active);
-    },
-  );
+  vi.spyOn(fakeBrowser.tabs, 'query').mockImplementation(async (queryInfo) => {
+    const tabs = (await original({ ...queryInfo, active: undefined })).map((t) => ({
+      ...t,
+      active: t.id === tabId,
+    }));
+    return queryInfo.active == null ? tabs : tabs.filter((t) => t.active === queryInfo.active);
+  });
 }
 
 async function closeTab(tabId: number) {
   const original = fakeBrowser.tabs.query.bind(fakeBrowser.tabs);
-  vi.spyOn(fakeBrowser.tabs, 'query').mockImplementation(
-    async (queryInfo: Browser.tabs.QueryInfo) =>
-      (await original(queryInfo)).filter((t: Browser.tabs.Tab) => t.id !== tabId),
+  vi.spyOn(fakeBrowser.tabs, 'query').mockImplementation(async (queryInfo) =>
+    (await original(queryInfo)).filter((t) => t.id !== tabId),
   );
   await fakeBrowser.tabs.onRemoved.trigger(tabId, { isWindowClosing: false, windowId: 0 });
 }
